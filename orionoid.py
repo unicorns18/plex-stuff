@@ -13,61 +13,53 @@ API_HOST = "https://api.orionoid.com"
 default_opts = [
     ["sortvalue","best"],
     ["streamtype","torrent"],
-    ["limitcount","20"],
+    ["limitcount","100"],
     ["filename","true"]
 ]
 
 session = requests.Session()
+def get_auth_url() -> str:
+    url = "https://api.orionoid.com?keyapp=TESTTESTTESTTESTTESTTESTTESTTEST&mode=user&action=authenticate"
+    return url
 
-def get_token(code: str = "") -> str:
-    """
-    Gets orion token.
+def get_token_url(code: str) -> str:
+    url = f"https://api.orionoid.com?keyapp=TESTTESTTESTTESTTESTTESTTESTTEST&mode=user&action=authenticate&code={code}"
+    return url
 
-    Parameters
-    ----------
-    code: str
-        Code from authentication URL.
+def request_auth_code(session: requests.Session) -> str:
+    url = get_auth_url()
+    response = session.get(url).json()
+    return response["data"]["direct"], response["data"]["code"]
 
-    Returns
-    -------
-    str
-        User Token.
+def authenticate(session: requests.Session, code: str) -> str:
+    url = get_token_url(code)
+    response = session.get(url).json()
+    return response
 
-    """
+def get_token(session: requests.Session, code: str = "") -> str:
     while True:
         try:
-            response = session.get(url="https://api.orionoid.com?keyapp=TESTTESTTESTTESTTESTTESTTESTTEST&mode=user&action=authenticate").json()
-            
-            print("Please visit the following link to authenticate your account:")
-            print(response["data"]["direct"], response["data"]["code"])
-            print("After you have authenticated your account, please copy the code from the URL and paste it here:")
-            code = input("Code: ")
-            print("Please wait...")
-            interval = 5
-            time.sleep(interval)
+            direct, auth_code = request_auth_code(session)
+            print(f"Please visit {direct} and enter the code {auth_code}")
             break
-        except Exception: # pylint: disable=W0703
-            print("Error: Please check your internet connection.")
+        except Exception:
             time.sleep(5)
             continue
 
     while True:
         try:
-            response = session.get(url=f"https://api.orionoid.com?keyapp=TESTTESTTESTTESTTESTTESTTESTTEST&mode=user&action=authenticate&code={code}").json()
+            response = authenticate(session, code)
             interval = 5
             if response["result"]["type"] == "userauthapprove":
                 return response["data"]["token"]
             elif response["result"]["type"] == "userauthinreject":
-                print("Error: User rejected access for your app.")
                 break
             elif response["result"]["type"] == "userauthexpired":
-                print("Error: Authentication process expired. Please restart the process.")
                 break
             else:
-                time.sleep(interval) # sleep for the interval returned by the request
+                time.sleep(interval)
                 continue
         except requests.exceptions.ConnectionError:
-            print("Error: Please check your internet connection.")
             time.sleep(5)
             continue
 

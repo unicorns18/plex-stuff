@@ -102,26 +102,24 @@ def score_title(title: str) -> int:
             score += points
     return score
 
+def encode_ascii(title: str) -> str:
+    return title.encode('ascii', 'ignore').decode('ascii')
+
+def remove_unwanted_chars(title: str) -> str:
+    return re.sub(r'(\||\/)', '', title)
+
+def condense_periods(title: str) -> str:
+    return re.sub(r'\.{2,}', '.', title)
+
+def remove_leading_period(title: str) -> str:
+    return title[1:] if title.startswith('.') else title
+
 def clean_title(title: str) -> str:
-    """
-    Clean the title from unwanted characters.
-
-    Parameters
-    ----------
-    title: str
-        Title of the video.
-
-    Returns
-    -------
-    str
-        Cleaned title.
-    """
     try:
-        title = title.encode('ascii', 'ignore').decode('ascii')
-        title = re.sub(r'(\||\/)', '', title)
-        title = re.sub(r'\.{2,}', '.', title)
-        if title[0] == '.':
-            title = title[1:]
+        title = encode_ascii(title)
+        title = remove_unwanted_chars(title)
+        title = condense_periods(title)
+        title = remove_leading_period(title)
         return title
     except (AttributeError, TypeError, UnicodeDecodeError) as exc:
         raise ValueError(f"Invalid title: {title}") from exc
