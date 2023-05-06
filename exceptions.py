@@ -16,3 +16,8 @@ class IMDBIdNotFoundError(Exception):
     """
     Custom exception.
     """
+
+class RequestException(Exception):
+    """
+    Custom exception.
+    """

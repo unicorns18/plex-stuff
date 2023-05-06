@@ -1,5 +1,4 @@
 # pylint: disable=C0114,C0116,C0301
-import time
 import requests
 
 session = requests.Session()
@@ -119,32 +118,31 @@ def save_links(links):
     data = {"links": links}
     response = session.get(url, params=data)
     return response.json()
-def main(apikey="tXQQw2JPx8iKEyeeOoJE", magnet="b23d0ba3f725f60e7953234f7357f10235ae4272"):
-    rate_limit = 1/12
-    uploaded_magnet = upload_magnet(magnet_uri=magnet)
-    magnet_id = uploaded_magnet["data"]["magnets"][0]["id"]
-    magnet_status = get_magnet_status(apikey=apikey, magnet_id=magnet_id)
-    while magnet_status["data"]["magnets"]["status"] != "Ready":
-        magnet_status = get_magnet_status(apikey=apikey, magnet_id=magnet_id)
-        time.sleep(rate_limit)
-    torrent_files = magnet_status["data"]["magnets"]["links"]
-    torrent_links = []
-    for torrent_file in torrent_files:
-        torrent_links.append(torrent_file["link"])
+def main(apikey="tXQQw2JPx8iKEyeeOoJE", magnet="b23d0ba3f725f60e7953234f7357f10235ae4272"): #pylint: disable=W0613
+    cached = check_instant_availability(magnet_uri=magnet)
+    print(cached)
+    # rate_limit = 1/12
+    # uploaded_magnet = upload_magnet(magnet_uri=magnet)
+    # magnet_id = uploaded_magnet["data"]["magnets"][0]["id"]
+    # magnet_status = get_magnet_status(apikey=apikey, magnet_id=magnet_id)
+    # while magnet_status["data"]["magnets"]["status"] != "Ready":
+    #     magnet_status = get_magnet_status(apikey=apikey, magnet_id=magnet_id)
+    #     time.sleep(rate_limit)
+    # torrent_files = magnet_status["data"]["magnets"]["links"]
+    # torrent_links = []
+    # for torrent_file in torrent_files:
+    #     torrent_links.append(torrent_file["link"])
 
-    if len(torrent_links) > 0:
-        saved_links = []
+    # if len(torrent_links) > 0:
+    #     saved_links = []
 
-        for link in torrent_links:
-            unlock_link(link=link)
-            time.sleep(rate_limit)
-            saved_links.append(link)
+    #     for link in torrent_links:
+    #         unlock_link(link=link)
+    #         time.sleep(rate_limit)
+    #         saved_links.append(link)
 
-        links_saved = save_links(links=saved_links)
+    #     links_saved = save_links(links=saved_links)
 
-        return links_saved["status"] == "success"
-    else:
-        return False
-
-if __name__ == "__main__":
-    main()
+    #     return links_saved["status"] == "success"
+    # else:
+    #     return False
