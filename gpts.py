@@ -20,7 +20,7 @@ CLIENT_ID = "GVFTUUBKFCK67DC8AR9EF2QHCP8GDCME"
 API_HOST = "https://api.orionoid.com"
 
 session = requests.Session()
-CACHE_CHECK = False
+CACHE_CHECK = True
 
 class OrionSearch:
     """
@@ -464,8 +464,9 @@ class OrionSearch:
                                 magnet_uri = item.get("links", [])[0]
                                 instant_availability = check_instant_availability(magnet_uri)
                                 item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
+                        filtered_results = [item for item in sorted_results if not (item["cached"] is False and item.get("seeds") is None)]
                         with open(f'results/{filename_prefix}_{"_".join(qualities)}_S{season:02d}_orionoid.json', 'w', encoding='utf-8') as file_tv:
-                            json.dump(sorted_results, file_tv, indent=4, sort_keys=True)
+                            json.dump(filtered_results, file_tv, indent=4, sort_keys=True)
 
         elif title_type == MEDIA_TYPE_MOVIE:
             for qualities in qualities_sets:
@@ -483,8 +484,9 @@ class OrionSearch:
                         magnet_uri = item.get("links", [])[0]
                         instant_availability = check_instant_availability(magnet_uri)
                         item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
+                filtered_results = [item for item in sorted_results if not (item["cached"] is False and item.get("seeds") is None)]
                 with open(f'results/{filename_prefix}_{"_".join(qualities)}_orionoid.json', 'w', encoding='utf-8') as file_movie:
-                    json.dump(result, file_movie, indent=4, sort_keys=True)
+                    json.dump(filtered_results, file_movie, indent=4, sort_keys=True)
         else:
             print(f"Unknown type for {title}")
     

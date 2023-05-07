@@ -1,5 +1,6 @@
 [
     {
+        "cached": false,
         "links": [
             "magnet:?xt=urn:btih:1B42B99B9FBC0E0416A379787F250EB73B7434E3&dn=Breaking%20Bad%20COMPLETE%20S01-S05%202160p%20WEB-DL%20Rus%20Ukr%20Eng%20DTS-HD%20MA5.1%20x264-TrollUHD%20%5BRiCK%5D&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.cyberia.is%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.birkenwald.de%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.moeking.me%3A6969%2Fannounce&tr=udp%3A%2F%2Fipv4.tracker.harry.lu%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2970%2Fannounce"
         ],
@@ -10,16 +11,7 @@
         "title": "Breaking.Bad.COMPLETE.S01-S05.2160p.WEB-DL.Rus.Ukr.Eng.DTS-HD.MA5.1.x264-TrollUHD.[RiCK]"
     },
     {
-        "links": [
-            "magnet:?xt=urn:btih:FEE8DED12F73244BBE90009B019ED7B522BD1193&dn=Breaking.Bad.S04.2160p.WEB-DL.3xRus.Eng.TrollUHD-ULTRAHDCLUB&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.birkenwald.de%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.filemail.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.moeking.me%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.bt4g.com%3A2095%2Fannounce&tr=http%3A%2F%2Ftracker.files.fm%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.beeimg.com%3A6969%2Fannounce&tr=http%3A%2F%2Fopen.acgnxtracker.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.monitorit4.me%3A6969%2Fannounce&tr=udp%3A%2F%2Fmovies.zsw.ca%3A6969%2Fannounce&tr=udp%3A%2F%2Fretracker01-msk-virt.corbina.net%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.altrosky.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A6969%2Fannounce&tr=https%3A%2F%2Ftracker.loligirl.cn%3A443%2Fannounce&tr=udp%3A%2F%2Ftracker.srv00.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fu4.trakx.crim.ist%3A1337%2Fannounce&tr=udp%3A%2F%2Faarsen.me%3A6969%2Fannounce&tr=udp%3A%2F%2Fmoonburrow.club%3A6969%2Fannounce&tr=udp%3A%2F%2Fuploads.gamecoast.net%3A6969%2Fannounce&tr=udp%3A%2F%2Fmail.artixlinux.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.artixlinux.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fbt.ktrackers.com%3A6666%2Fannounce&tr=https%3A%2F%2Ftracker.kuroy.me%3A443%2Fannounce&tr=http%3A%2F%2Fparag.rs%3A6969%2Fannounce"
-        ],
-        "quality": "hd4k",
-        "seeds": 0,
-        "size": 27.272342824,
-        "source": "bitlord",
-        "title": "Breaking.Bad.S04.2160p.WEB-DL.3xRus.Eng.TrollUHD-ULTRAHDCLUB"
-    },
-    {
+        "cached": true,
         "links": [
             "magnet:?xt=urn:btih:157B16F5F6164B359A23CDB1837D48CBB9A66961&dn=%5BBitsearch.to%5D%20Breaking.Bad.S04.2160p.WEB-DL.3xRus.Eng.TrollUHD-ULTRAHDCLUB&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fipv4.tracker.harry.lu%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.moeking.me%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce"
         ],
@@ -30,10 +22,22 @@
         "title": "Breaking.Bad.S04.2160p.WEB-DL.3xRus.Eng.TrollUHD-ULTRAHDCLUB"
     },
     {
+        "cached": false,
+        "links": [
+            "magnet:?xt=urn:btih:FEE8DED12F73244BBE90009B019ED7B522BD1193&dn=Breaking.Bad.S04.2160p.WEB-DL.3xRus.Eng.TrollUHD-ULTRAHDCLUB&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.birkenwald.de%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.filemail.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.moeking.me%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.bt4g.com%3A2095%2Fannounce&tr=http%3A%2F%2Ftracker.files.fm%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.beeimg.com%3A6969%2Fannounce&tr=http%3A%2F%2Fopen.acgnxtracker.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.monitorit4.me%3A6969%2Fannounce&tr=udp%3A%2F%2Fmovies.zsw.ca%3A6969%2Fannounce&tr=udp%3A%2F%2Fretracker01-msk-virt.corbina.net%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.altrosky.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A6969%2Fannounce&tr=https%3A%2F%2Ftracker.loligirl.cn%3A443%2Fannounce&tr=udp%3A%2F%2Ftracker.srv00.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fu4.trakx.crim.ist%3A1337%2Fannounce&tr=udp%3A%2F%2Faarsen.me%3A6969%2Fannounce&tr=udp%3A%2F%2Fmoonburrow.club%3A6969%2Fannounce&tr=udp%3A%2F%2Fuploads.gamecoast.net%3A6969%2Fannounce&tr=udp%3A%2F%2Fmail.artixlinux.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.artixlinux.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fbt.ktrackers.com%3A6666%2Fannounce&tr=https%3A%2F%2Ftracker.kuroy.me%3A443%2Fannounce&tr=http%3A%2F%2Fparag.rs%3A6969%2Fannounce"
+        ],
+        "quality": "hd4k",
+        "seeds": 0,
+        "size": 27.272342824,
+        "source": "bitlord",
+        "title": "Breaking.Bad.S04.2160p.WEB-DL.3xRus.Eng.TrollUHD-ULTRAHDCLUB"
+    },
+    {
+        "cached": true,
         "links": [
             "magnet:?xt=urn:btih:7fae136242d759236472b96c7e2d7ec2b930be8e&dn=Breaking+Bad+Season+4+%282160p+x265+10bit+Joy%29&tr=http%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.tfile.me%2Fannounce&tr=http%3A%2F%2Fbigfoot1942.sektori.org%3A6969%2Fannounce&tr=udp%3A%2F%2Feddie4.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker4.piratux.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.trackerfix.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.pomf.se%3A80%2Fannounce&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.blackunicorn.xyz%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.ch%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.ilibr.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.ilibr.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.zer0day.to%3A1337%2Fannounce&tr=udp%3A%2F%2F9.rarbg.com%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.piratepublic.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.pirateparty.gr%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2730%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2740%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2720%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2740%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2770%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451&tr=udp%3A%2F%2Ftracker.port443.xyz%3A6969%2Fannounce&tr=udp%3A%2F%2FIPv6.open-internet.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Fdenis.stalker.upeer.me%3A1337%2Fannounce&tr=udp%3A%2F%2Fshadowshq.yi.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.mg64.net%3A6969%2Fannounce&tr=udp%3A%2F%2Finferno.demonoid.pw%3A3418%2Fannounce&tr",
             "https://www.torrentfunk2.com/tor/20841626.torrent",
-            "https://orionoid.com/container/M7PMRY2UQG5HOOE7DM7GRO7VEGLRG35V5U5I6S77EVFDPSEQG5CREPB5GQ7RR3ZKQTM6JTEN2YJPYYKUFQ76CMY77LEBYF53GOVFCMNSS5PMYI6BPHUPNIRGB7AWXUGTWFVH442RRJBCCDLXGIWSPENNNYB55NQ2OARBBTD2WDLCHE3D4EUQ"
+            "https://orionoid.com/container/M6OLD3XCCEJSL4RXGSBEFZG5ADD2AORNCTKZH5FRQPXXWDFWWMWBEAQSOT35H75H4AWTKUAD4SFS2DDLRPC35QJV5LJBBRZZYONDAG5QOQC726HC6SPEG5X5LAN5JUNSQKP4DWCJ2EVG75O4VI7PY7UFPPB62Z27LUPFHSRDDBO2DIHJFPOQ"
         ],
         "quality": "hd4k",
         "seeds": 9,
@@ -42,10 +46,11 @@
         "title": "Breaking.Bad.Season.4.(2160p.x265.10bit.Joy)"
     },
     {
+        "cached": true,
         "links": [
             "magnet:?xt=urn:btih:7fae136242d759236472b96c7e2d7ec2b930be8e&dn=Breaking+Bad+Season+4+%282160p+x265+10bit+Joy%29&tr=http%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.tfile.me%2Fannounce&tr=http%3A%2F%2Fbigfoot1942.sektori.org%3A6969%2Fannounce&tr=udp%3A%2F%2Feddie4.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker4.piratux.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.trackerfix.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.pomf.se%3A80%2Fannounce&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.blackunicorn.xyz%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.ch%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.ilibr.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.ilibr.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.zer0day.to%3A1337%2Fannounce&tr=udp%3A%2F%2F9.rarbg.com%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.piratepublic.com%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.pirateparty.gr%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2730%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2740%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2720%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2740%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2770%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451&tr=udp%3A%2F%2Ftracker.port443.xyz%3A6969%2Fannounce&tr=udp%3A%2F%2FIPv6.open-internet.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Fdenis.stalker.upeer.me%3A1337%2Fannounce&tr=udp%3A%2F%2Fshadowshq.yi.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.mg64.net%3A6969%2Fannounce&tr=udp%3A%2F%2Finferno.demonoid.pw%3A3418%2Fannounce&tr",
             "https://www.torlock2.com/tor/8750087.torrent",
-            "https://orionoid.com/container/M7PMRY2UQG5HOOE7DM7GRO7VEGLRG35V5U5I6S77EVFDPSEQG5CREPB5GQ7RR3ZKQTM6JTEN2YJPYYKUFQ76CMY77LEBYF53GOVFCMNFRK7POE7TDTKLHO3C5CYU6NGQQMHO5P6YV6GOUPR2UBJV2FW7CJSZ2AFBFV2UKBVTIVTD4ZEAOKDQ"
+            "https://orionoid.com/container/M6OLD3XCCEJSL4RXGSBEFZG5ADD2AORNCTKZH5FRQPXXWDFWWMWBEAQSOT35H75H4AWTKUAD4SFS2DDLRPC35QJV5LJBBRZZYONDAG3KJROYSDEHKKBCAQ7T3VKKACB4F7TEUPT7ZQH34J3ZGE3S3JB32TIBO5YOKSMLNWJQNWE7TCY4LKGQ"
         ],
         "quality": "hd4k",
         "seeds": 2,
@@ -54,6 +59,7 @@
         "title": "Breaking.Bad.Season.4.(2160p.x265.10bit.Joy)"
     },
     {
+        "cached": false,
         "links": [
             "magnet:?xt=urn:btih:43E71F7EDA66EF7DD5D656CEC2A23DCD322865E7&dn=%5BBitsearch.to%5D%20Breaking.Bad.S04.MULTi.2160p.NF.WEB-DL.DDP5.1.HEVC-kusiu&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker2.dler.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fwww.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Ftracker.breizh.pm%3A6969%2Fannounce"
         ],
@@ -64,6 +70,7 @@
         "title": "Breaking.Bad.S04.MULTi.2160p.NF.WEB-DL.DDP5.1.HEVC-kusiu"
     },
     {
+        "cached": false,
         "links": [
             "magnet:?xt=urn:btih:7A95B42CD854FA46407BF9E3085AC6EC47A5819A&dn=%5BBitsearch.to%5D%20%E3%80%90%E9%AB%98%E6%B8%85%E5%89%A7%E9%9B%86%E7%BD%91%20www.BTHDTV.com%E3%80%91%E7%BB%9D%E5%91%BD%E6%AF%92%E5%B8%88%20%E7%AC%AC%E5%9B%9B%E5%AD%A3%5B%E5%85%A813%E9%9B%86%5D%5B%E7%AE%80%E7%B9%81%E8%8B%B1%E5%AD%97%E5%B9%95%5D.Breaking.Bad.S04.2160p.NF.WEB-DL.DDP.5.1.H.265-BlackTV&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fwww.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2F9.rarbg.com%3A2920%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce"
         ],
@@ -74,6 +81,7 @@
         "title": "www.BTHDTV.com.[13][].Breaking.Bad.S04.2160p.NF.WEB-DL.DDP.5.1.H.265-BlackTV"
     },
     {
+        "cached": true,
         "links": [
             "magnet:?xt=urn:btih:7FAE136242D759236472B96C7E2D7EC2B930BE8E&dn=%5BBitsearch.to%5D%20Breaking%20Bad%20Season%204%20%282160p%20x265%2010bit%20Joy%29&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.moeking.me%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce"
         ],
