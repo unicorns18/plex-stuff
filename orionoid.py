@@ -6,11 +6,12 @@ import json
 import gzip
 import re
 from time import sleep
+import time
 from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 import ijson
 import requests
-from alldebrid import check_instant_availability
+from alldebrid import check_cached_instant_availabilities, check_instant_availability
 from filters import clean_title
 from tmdb import MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV, is_movie_or_tv_show
 
@@ -216,9 +217,11 @@ class OrionSearch:
             Options for Query.
         """
         if season_number is not None and int(season_number) != 0:
-            opts += '&numberseason=' + str(int(season_number))
+            # opts += '&numberseason=' + str(int(season_number))
+            opts += f"&numberseason={int(season_number)}"
             if episode_number is not None and int(episode_number) != 0:
-                opts += '&numberepisode=' + str(int(episode_number))
+                opts += f"&numberepisode={int(episode_number)}"
+                # opts += '&numberepisode=' + str(int(episode_number))
         return opts
 
     def build_url(self, token: str, query: str, type_: str, opts: str) -> str:
@@ -420,10 +423,14 @@ class OrionSearch:
                     print(f"Attempt {attempt + 1} failed. Retrying in {sleep_time} seconds. Error: {exc}")
                     sleep(sleep_time)
 
+    def save_filtered_results(self, results, filename, encoding='utf-8'):
+        filtered_results = [item for item in results if not (item["cached"] is False and item.get("seeds") is None)]
+        with open(filename, 'w', encoding=encoding) as file:
+            json.dump(filtered_results, file, indent=4, sort_keys=True)
+
     def search_best_qualities(self, title: str, qualities_sets: List[List[str]], filename_prefix: str):
         """
         Search for the best qualities of the given title and save the sorted results to a JSON file.
-
         Parameters
         ----------
         title: str
@@ -432,11 +439,11 @@ class OrionSearch:
             A list of lists containing the qualities to search for in the results.
         filename_prefix: str
             A string to use as a prefix for the output JSON files.
-
         Returns
         -------
         None
         """
+        start_time = time.perf_counter()
         title_type = is_movie_or_tv_show(title=title, api_key=TMDB_API_KEY, api_url="https://api.themoviedb.org/3")
 
         if title_type == MEDIA_TYPE_TV:
@@ -459,14 +466,18 @@ class OrionSearch:
                         self.default_opts = default_opts
                         result = self.search(query=title, altquery=altquery_season)
                         sorted_results = sorted(result, key=self.custom_sort, reverse=True)
-                        if CACHE_CHECK:
-                            for item in result:
-                                magnet_uri = item.get("links", [])[0]
-                                instant_availability = check_instant_availability(magnet_uri)
-                                item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
+                        magnet_uris = [item.get("links", [])[0] for item in result]
+                        instant_availabilities = check_cached_instant_availabilities(magnet_uris)
+                        for item, instant_availability in zip(result, instant_availabilities):
+                            item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
+                        # if CACHE_CHECK:
+                        #     for item in result:
+                        #         magnet_uri = item.get("links", [])[0]
+                        #         instant_availability = check_instant_availability(magnet_uri)
+                        #         item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
                         filtered_results = [item for item in sorted_results if not (item["cached"] is False and item.get("seeds") is None)]
-                        with open(f'results/{filename_prefix}_{"_".join(qualities)}_S{season:02d}_orionoid.json', 'w', encoding='utf-8') as file_tv:
-                            json.dump(filtered_results, file_tv, indent=4, sort_keys=True)
+                        filename = f'results/{filename_prefix}_{"_".join(qualities)}_S{season:02d}_orionoid.json'
+                        self.save_filtered_results(filtered_results, filename)
 
         elif title_type == MEDIA_TYPE_MOVIE:
             for qualities in qualities_sets:
@@ -479,16 +490,22 @@ class OrionSearch:
                 ]
                 self.default_opts = default_opts
                 result = self.search(query=title, altquery=title)
+                sorted_results = sorted(result, key=self.custom_sort, reverse=True)
+                first_result = sorted_results[0]
+
                 if CACHE_CHECK:
-                    for item in result:
-                        magnet_uri = item.get("links", [])[0]
-                        instant_availability = check_instant_availability(magnet_uri)
-                        item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
-                filtered_results = [item for item in sorted_results if not (item["cached"] is False and item.get("seeds") is None)]
-                with open(f'results/{filename_prefix}_{"_".join(qualities)}_orionoid.json', 'w', encoding='utf-8') as file_movie:
-                    json.dump(filtered_results, file_movie, indent=4, sort_keys=True)
+                    magnet_uri = first_result.get("links", [])[0]
+                    instant_availability = check_instant_availability(magnet_uri)
+                    first_result["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
+
+                filtered_results = [first_result] + [item for item in sorted_results[1:] if not (item["cached"] is False and item.get("seeds") is None)]
+                filename = f'results/{filename_prefix}_{"_".join(qualities)}_orionoid.json'
+                self.save_filtered_results(filtered_results, filename)
         else:
             print(f"Unknown type for {title}")
+        
+        end_time = time.perf_counter()
+        print(f"Finished in {end_time - start_time:0.4f} seconds")
     
 QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
 TITLE = "Breaking Bad"
