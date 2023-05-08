@@ -1,414 +1,175 @@
+#pylint: disable=C0301,C0116,c0303
 """
-TODO: Finish this docstring, and fix this mess.
+TODO: Write a docstring
 """
-#pylint: disable=C0301,C0303
-import json
+from functools import lru_cache
+from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 import gzip
+import json
 import re
-from time import sleep
 import time
 from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode
 import ijson
 import requests
-from alldebrid import check_cached_instant_availabilities, check_instant_availability
+from requests import session
+from alldebrid import AllDebrid
+
 from filters import clean_title
 from tmdb import MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV, is_movie_or_tv_show
 
-TOKEN = "ZZBAYPMQTXGGVHPKZJO5Y4SQJO3NA3XE7WBJLN67DOA3TLLQ3A7VMP532XSIDGKRPNQPCHNEV5HUGTD4UEU5IE6FBP4N7VV3ZZBKM6LZRUZ2WM7KKDKIYFJLV6C26JHA"
-TMDB_API_KEY = "cea9c08287d26a002386e865744fafc8"
-CLIENT_ID = "GVFTUUBKFCK67DC8AR9EF2QHCP8GDCME"
-API_HOST = "https://api.orionoid.com"
-
 session = requests.Session()
-CACHE_CHECK = True
+TOKEN = "ZZBAYPMQTXGGVHPKZJO5Y4SQJO3NA3XE7WBJLN67DOA3TLLQ3A7VMP532XSIDGKRPNQPCHNEV5HUGTD4UEU5IE6FBP4N7VV3ZZBKM6LZRUZ2WM7KKDKIYFJLV6C26JHA"
+API_HOST = "https://api.orionoid.com"
+DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
+TMDB_API_KEY = "cea9c08287d26a002386e865744fafc8"
+BASE_URL = "https://api.themoviedb.org/3"
+ad = AllDebrid(apikey=DEFAULT_API_KEY)
 
-class OrionSearch:
-    """
-    Search the Orion Search Engine.
+def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
+    if altquery == "(.*)":
+        altquery = query
+    return query, altquery
 
-    Parameters
-    ----------
-    token: str
-        Orion Search Engine Token.
-    default_opts: list
-        Default Options for Orion Search Engine.
+def determine_type(altquery: str) -> str:
+    return "show" if re.search(r'(S[0-9]|complete|S\?[0-9])', altquery, re.I) else "movie"
 
-    Attributes
-    ----------
-    token: str
-    default_opts: list
-    session: requests.Session
+def build_opts(default_opts) -> str:
+    return '&'.join(['='.join(opt) for opt in default_opts])
 
-    Methods
-    -------
-    search(self, query: str, altquery: str) -> Optional[Dict]:
-        Search the Orion Search Engine.
+def extract_season_episode(altquery: str, type_: str) -> Tuple[Optional[str], Optional[str]]:
+    if type_ == "show":
+        season_number = re.search(r'(?<=S)([0-9]+)', altquery, re.I)
+        episode_number = re.search(r'(?<=E)([0-9]+)', altquery, re.I)
+        return (season_number.group() if season_number else None, episode_number.group() if episode_number else None)
+    return None, None
 
-    normalize_queries(self, query: str, altquery: str) -> tuple:
-        Normalize the Queries.
+def add_season_episode(opts: str, season_number: Optional[str], episode_number: Optional[str]) -> str:
+    if season_number is not None and int(season_number) != 0:
+        opts += f"&numberseason={int(season_number)}"
+        if episode_number is not None and int(episode_number) != 0:
+            opts += f"&numberepisode={int(episode_number)}"
+    return opts
 
-    determine_type(self, altquery: str) -> str:
-        Determine the Type of Query.
+def build_url(token: str, query: str, type_: str, opts: str, debridresolve: str = "user") -> str:
+    if re.search(r'(tt[0-9]+)', query, re.I):
+        idimdb = query[2:]
+        query_params = urlencode({'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_, 'idimdb': idimdb})
+    else:
+        query_params = urlencode({'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_, 'query': query})
 
-    build_opts(self, default_opts: list) -> list:
-        Build the Options for Query.
+    if debridresolve:
+        query_params += f"&debridlookup={debridresolve}"
 
-    extract_season_episode(self, altquery: str, type_: str) -> tuple:
-        Extract the Season and Episode from the Query.
+    return f'https://api.orionoid.com?{query_params}&{opts}'
 
-    add_season_episode(self, opts: list, season_number: int, episode_number: int) -> list:
-        Add Season and Episode to Options.
+def response_is_successful(response: dict) -> bool:
+    return response['result']['status'] == 'success'
 
-    build_url(self, token: str, query: str, type_: str, opts: list) -> str:
-        Build the URL for Query.
+def response_has_data(response: dict) -> bool:
+    return "data" in response and "streams" in response["data"]
 
-    response_is_successful(self, response: Dict) -> bool:
-        Check the Response is Successful.
+def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -> Tuple[str, int, int]:
+    match = "None"
+    total = 0
+    retrieved = 0
 
-    response_has_data(self, response: Dict) -> bool:
-        Check the Response has Data.
+    if "data" in response:
+        if "movie" in response["data"]:
+            match = response["data"]["movie"]["meta"]["title"] + ' ' + str(response["data"]["movie"]["meta"]["year"])
+        elif "show" in response["data"]:
+            match = response["data"]["show"]["meta"]["title"] + ' ' + str(response["data"]["show"]["meta"]["year"])
 
-    extract_match_type_total_retrieved(self, response: Dict, query: str, type_: str) -> tuple:
-        Extract the Match, Type, Total, Retrieved from the Response.
+        total = response["data"]["count"]["total"]
+        retrieved = response["data"]["count"]["retrieved"]
 
-    extract_scraped_releases(self, response: Dict) -> Dict:
-        Extract the Scraped Releases from the Response.
-    """
-    BASE_URL = "https://api.themoviedb.org/3"
-    def __init__(self, token: str, default_opts=None):
-        self.token = token
-        self.default_opts = default_opts or [
-            ["sortvalue", "best"],
-            ["streamtype", "torrent"],
-            ["limitcount", "100"],
-            ["filename", "true"]
-        ]
-        self.session = requests.Session()
+        print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
 
-    def search(self, query: str, altquery: str) -> Optional[Dict]:
-        """
-        Search the Orion Search Engine.
+    return match, total, retrieved
 
-        Parameters
-        ----------
-        query: str
-            Query for Orion Search Engine.
-        altquery: str
-            Alternative Query for Orion Search Engine.
+def extract_scraped_releases(response: dict) -> List[Dict]:
+    scraped_releases = []
 
-        Returns
-        -------
-        dict
-            Scraped Releases.
-        """
-        query, altquery = self.normalize_queries(query, altquery)
-        type_ = self.determine_type(altquery)
-        opts = self.build_opts(self.default_opts)
-        season_number, episode_number = self.extract_season_episode(altquery, type_)
-        opts = self.add_season_episode(opts, season_number, episode_number)
-        url = self.build_url(self.token, query, type_, opts)
-        response = self.session.get(url).json()
+    for res in response["data"]["streams"]:
+        title = clean_title(res['file']['name'].split('\n')[0].replace(' ', '.'))
+        size = (float(res["file"]["size"]) / 1000000000 if "size" in res["file"] else 0)
+        links = res["links"]
+        seeds = res["stream"]["seeds"] if "stream" in res and "seeds" in res["stream"] else 0
+        source = res["stream"]["source"] if "stream" in res and "source" in res["stream"] else ""
+        quality = res["video"]["quality"] if "video" in res and "quality" in res["video"] else ""
 
-        if not self.response_is_successful(response):
-            print("Error: Did not receive a successful response from the server.")
-            return None
+        scraped_releases.append({
+            "title": title,
+            "size": size,
+            "links": links,
+            "seeds": seeds,
+            "source": source,
+            "quality": quality
+        })
 
-        if not self.response_has_data(response):
-            print("data not found in response")
-            return None
-
-        #print("data found in response, streams found in data, continuing...")
-        match, total, retrieved = self.extract_match_type_total_retrieved(response, query, type_) #pylint: disable=W0612
-        scraped_releases = self.extract_scraped_releases(response)
-
-        return scraped_releases
+    return scraped_releases
     
-    def normalize_queries(self, query: str, altquery: str) -> Tuple[str, str]:
-        """
-        Normalize the Queries.
+def search(query: str, altquery: str, quality_opts) -> Optional[Dict]:
+    query, altquery = normalize_queries(query, altquery)
+    type_ = determine_type(altquery)
+    opts = build_opts(quality_opts)
+    season_number, episode_number = extract_season_episode(altquery, type_)
+    opts = add_season_episode(opts, season_number, episode_number)
+    url = build_url(TOKEN, query, type_, opts, debridresolve="alldebrid")
+    print(url)
+    response = session.get(url).json()
 
-        Parameters
-        ----------
-        query: str
-            Query for Orion Search Engine.
-        altquery: str
-            Alternative Query for Orion Search Engine.
+    if not response_is_successful(response):
+        print("Error: Did not receive a successful response from the server.")
+        return None
 
-        Returns
-        -------
-        tuple
-            Normalized Queries.
-        """
-        if altquery == "(.*)":
-            altquery = query
-        return query, altquery
+    if not response_has_data(response):
+        print("data not found in response")
+        return None
 
-    def determine_type(self, altquery: str) -> str:
-        """
-        Determine the Type of Query.
+    print("data found in response, streams found in data, continuing...")
+    match, total, retrieved = extract_match_type_total_retrieved(response, query, type_) #pylint: disable=W0612
+    scraped_releases = extract_scraped_releases(response)
 
-        Parameters
-        ----------
-        altquery: str
-            Alternative Query for Orion Search Engine.
+    if not scraped_releases:
+        print("No scraped releases found in response")
+        return None
 
-        Returns
-        -------
-        str
-            Type of Query.
-        """
-        return "show" if re.search(r'(S[0-9]|complete|S\?[0-9])', altquery, re.I) else "movie"
+    return scraped_releases
 
-    def build_opts(self, default_opts) -> str:
-        """
-        Build the Options for Query.
+def custom_sort(item: Dict[str, Union[float, int]]) -> Tuple[float, int]:
+    size_weight = item.get("size", 0) or 0
+    seeds_weight = item.get("seeds", 0) or 0
+    instant_weight = int(not item.get("cached", False))
+    return (size_weight, instant_weight, seeds_weight)
 
-        Parameters
-        ----------
-        default_opts: list
-            Default Options for Orion Search Engine.
+@lru_cache(maxsize=100)
+def get_tv_show_data(url: str, custom_session: Optional[requests.Session] = None) -> Optional[Dict]:
+    if custom_session is None:
+        custom_session = requests.Session()
+    with custom_session.get(url, timeout=10, stream=True) as response:
+        response.raise_for_status()
+        with gzip.open(response.raw, mode='rt', encoding='utf-8') as gzip_file:
+            tv_show_data = ijson.items(gzip_file, '')
+            return next(tv_show_data, None)
 
-        Returns
-        -------
-        list
-            Options for Query.
-        """
-        return '&'.join(['='.join(opt) for opt in default_opts])
+def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -> Optional[Dict]:
+    search_params = { "api_key": TMDB_API_KEY, "query": title }
+    search_url = f"{BASE_URL}/search/tv?{urlencode(search_params)}"
 
-    def extract_season_episode(self, altquery: str, type_: str) -> Tuple[Optional[str], Optional[str]]:
-        """
-        Extract the Season and Episode from the Query.
-
-        Parameters
-        ----------
-        altquery: str
-            Alternative Query for Orion Search Engine.
-        type_: str
-            Type of Query.
-
-        Returns
-        -------
-        tuple
-            Season and Episode.
-        """
-        if type_ == "show":
-            season_number = re.search(r'(?<=S)([0-9]+)', altquery, re.I)
-            episode_number = re.search(r'(?<=E)([0-9]+)', altquery, re.I)
-            return (season_number.group() if season_number else None, episode_number.group() if episode_number else None)
-        return None, None
-
-    def add_season_episode(self, opts: str, season_number: Optional[str], episode_number: Optional[str]) -> str:
-        """
-        Add Season and Episode to Options.
-
-        Parameters
-        ----------
-        opts: list
-            Options for Query.
-        season_number: int
-            Season Number.
-        episode_number: int
-            Episode Number.
-
-        Returns
-        -------
-        list
-            Options for Query.
-        """
-        if season_number is not None and int(season_number) != 0:
-            # opts += '&numberseason=' + str(int(season_number))
-            opts += f"&numberseason={int(season_number)}"
-            if episode_number is not None and int(episode_number) != 0:
-                opts += f"&numberepisode={int(episode_number)}"
-                # opts += '&numberepisode=' + str(int(episode_number))
-        return opts
-
-    def build_url(self, token: str, query: str, type_: str, opts: str) -> str:
-        """
-        Build the URL for Query.
-
-        Parameters
-        ----------
-        token: str
-            Orion Search Engine Token.
-        query: str
-            Query for Orion Search Engine.
-        type_: str
-            Type of Query.
-        opts: list
-            Options for Query.
-
-        Returns
-        -------
-        str
-            URL for Query.
-        """
-        if re.search(r'(tt[0-9]+)', query, re.I):
-            idimdb = query[2:]
-            query_params = urlencode({'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_, 'idimdb': idimdb})
-        else:
-            query_params = urlencode({'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_, 'query': query})
-        return f'https://api.orionoid.com?{query_params}&{opts}'
-
-    def response_is_successful(self, response: dict) -> bool:
-        """
-        Check the Response is Successful.
-
-        Parameters
-        ----------
-        response: dict
-            Response from Orion Search Engine.
-
-        Returns
-        -------
-        bool
-            Check the Response is Successful.
-        """
-        return response['result']['status'] == 'success'
-
-    def response_has_data(self, response: dict) -> bool:
-        """
-        Check the Response has Data.
-
-        Parameters
-        ----------
-        response: dict
-            Response from Orion Search Engine.
-
-        Returns
-        -------
-        bool
-            Check the Response has Data.
-        """
-        return "data" in response and "streams" in response["data"]
-
-    def extract_match_type_total_retrieved(self, response: dict, query: str, type_: str) -> Tuple[str, int, int]:
-        """
-        Extract the Match, Type, Total, Retrieved from the Response.
-
-        Parameters
-        ----------
-        response: dict
-            Response from Orion Search Engine.
-        query: str
-            Query for Orion Search Engine.
-        type_: str
-            Type of Query.
-
-        Returns
-        -------
-        tuple
-            Match, Type, Total, Retrieved.
-        """
-        match = "None"
-        total = 0
-        retrieved = 0
-
-        if "data" in response:
-            if "movie" in response["data"]:
-                match = response["data"]["movie"]["meta"]["title"] + ' ' + str(response["data"]["movie"]["meta"]["year"])
-            elif "show" in response["data"]:
-                match = response["data"]["show"]["meta"]["title"] + ' ' + str(response["data"]["show"]["meta"]["year"])
-
-            total = response["data"]["count"]["total"]
-            retrieved = response["data"]["count"]["retrieved"]
-
-            print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
-
-        return match, total, retrieved
-
-    def extract_scraped_releases(self, response: dict) -> List[Dict]:
-        """
-        Extract the Scraped Releases from the Response.
-
-        Parameters
-        ----------
-        response: dict
-            Response from Orion Search Engine.
-
-        Returns
-        -------
-        dict
-            Scraped Releases.
-        """
-        scraped_releases = []
-
-        for res in response["data"]["streams"]:
-            title = clean_title(res['file']['name'].split('\n')[0].replace(' ', '.'))
-            size = (float(res["file"]["size"]) / 1000000000 if "size" in res["file"] else 0)
-            links = res["links"]
-            seeds = res["stream"]["seeds"] if "stream" in res and "seeds" in res["stream"] else 0
-            source = res["stream"]["source"] if "stream" in res and "source" in res["stream"] else ""
-            quality = res["video"]["quality"] if "video" in res and "quality" in res["video"] else ""
-
-            scraped_releases.append({
-                "title": title,
-                "size": size,
-                "links": links,
-                "seeds": seeds,
-                "source": source,
-                "quality": quality
-            })
-
-        return scraped_releases
-    
-    def custom_sort(self, item: Dict[str, Union[float, int]]) -> Tuple[float, int]:
-        """
-        Calculate the custom sort value for a given item based on its size, seeds, and cache status.
-
-        Parameters
-        ----------
-        item: Dict[str, Union[float, int]]
-            A dictionary representing a media item containing "size", "seeds", and "cached" keys.
-
-        Returns
-        -------
-        Tuple[float, int]
-            A tuple containing the size_weight as the first element and the seeds_weight as the second element.
-        """
-        size_weight = item.get("size", 0) or 0
-        seeds_weight = item.get("seeds", 0) or 0
-        magnet_uri = item.get("links", [])[0]
-        if CACHE_CHECK:
-            cached = check_instant_availability(magnet_uri)
-            instant_weight = 1000000 if cached.get("data", {}).get("magnets", [])[0].get("instant", False) else 0
-        else:
-            instant_weight = 0
-        return (size_weight, instant_weight, seeds_weight)
-    
-    def get_season_data(self, title: str, retries: int = 3, backoff_factor: float = 2.0) -> Optional[Dict]:
-        """
-        Get the season data of tv show.
-
-        Parameters
-        ----------
-        title: str
-            Title of tv show.
-        retries: int
-            Number of retries to make.
-        backoff_factor: float
-            Sleep time between retries.
-
-        Returns
-        -------
-        Optional[Dict]
-            Season Data of Tv Show.
-        """
-        search_params = { "api_key": TMDB_API_KEY, "query": title }
-        search_url = f"{self.BASE_URL}/search/tv?{urlencode(search_params)}"
+    with requests.Session() as req_session:
         for attempt in range(retries + 1):
             try:
-                with requests.get(search_url, timeout=60, stream=True) as response:
+                with req_session.get(search_url, timeout=30, stream=True) as response:
                     response.raise_for_status()
                     with gzip.open(response.raw, mode='rt', encoding='utf-8') as gzip_file:
                         search_data = ijson.items(gzip_file, 'results.item')
                         tv_show = next(search_data, None)
                         if tv_show:
                             tv_show_id = tv_show["id"]
-                            tv_show_url = f"{self.BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
+                            tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
 
-                            with requests.get(tv_show_url, timeout=60, stream=True) as tv_show_response:
+                            with req_session.get(tv_show_url, timeout=30, stream=True) as tv_show_response:
                                 tv_show_response.raise_for_status()
                                 with gzip.open(tv_show_response.raw, mode='rt', encoding='utf-8') as gzip_tv_show_file:
                                     tv_show_data = ijson.items(gzip_tv_show_file, '')
@@ -421,95 +182,81 @@ class OrionSearch:
                 else:
                     sleep_time = backoff_factor * (2 ** attempt)
                     print(f"Attempt {attempt + 1} failed. Retrying in {sleep_time} seconds. Error: {exc}")
-                    sleep(sleep_time)
+                    time.sleep(sleep_time)
 
-    def save_filtered_results(self, results, filename, encoding='utf-8'):
-        filtered_results = [item for item in results if not (item["cached"] is False and item.get("seeds") is None)]
-        with open(filename, 'w', encoding=encoding) as file:
-            json.dump(filtered_results, file, indent=4, sort_keys=True)
+def save_filtered_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
+    filtered_results = [item for item in results[1:] if item.get("seeds") is not None]
 
-    def search_best_qualities(self, title: str, qualities_sets: List[List[str]], filename_prefix: str):
-        """
-        Search for the best qualities of the given title and save the sorted results to a JSON file.
-        Parameters
-        ----------
-        title: str
-            The title of the media (movie or TV show) to search for.
-        qualities_sets: List[List[str]]
-            A list of lists containing the qualities to search for in the results.
-        filename_prefix: str
-            A string to use as a prefix for the output JSON files.
-        Returns
-        -------
-        None
-        """
-        start_time = time.perf_counter()
-        title_type = is_movie_or_tv_show(title=title, api_key=TMDB_API_KEY, api_url="https://api.themoviedb.org/3")
+    with open(filename, 'w', encoding=encoding, buffering=8192) as file:
+        for chunk in json.JSONEncoder(indent=4, sort_keys=True).iterencode(filtered_results):
+            file.write(chunk)
+        
+def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
+    checkmagnets = alldebrid.check_magnet_instant(magnets=magnets)
+    
+    if checkmagnets and checkmagnets['status'] == 'success':
+        cached = checkmagnets['data']['magnets']
+        instant_values = [magnet_data.get('instant', False) for magnet_data in cached]
+    else:
+        instant_values = [False] * len(magnets)
 
+    return instant_values
+
+def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_prefix: str):
+    start_time = time.perf_counter()
+    title_type = is_movie_or_tv_show(title=title, api_key=TMDB_API_KEY, api_url="https://api.themoviedb.org/3")
+
+    def process_quality(qualities: List[str], season: Optional[int] = None):
+        altquery = title if title_type == MEDIA_TYPE_MOVIE else f"{title} S{season:02d}"
+        default_opts = [
+            ["sortvalue", "best"],
+            ["streamtype", "torrent"],
+            ["limitcount", "50"],
+            ["filename", "true"],
+            ["videoquality", ','.join(qualities)],
+        ]
+        result = search(query=title, altquery=altquery, quality_opts=default_opts)
+
+        filtered_results = [item for item in result if item.get("seeds") is not None]
+
+        magnets = (item['links'][0] for item in filtered_results)
+        cached_instants = get_cached_instants(ad, magnets)
+        for item, instant in zip(filtered_results, cached_instants):
+            item["cached"] = instant if instant is not False else False
+
+        post_processed_results = [item for item in filtered_results if item["cached"] is not False or (item.get("seeds") is not None and item["seeds"] > 0)]
+
+        post_processed_results.sort(key=custom_sort, reverse=True)
+
+        season_suffix = f"_{season:02d}" if season else ""
+        post_processed_filename = f'postprocessing_results/{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
+        save_filtered_results(post_processed_results, post_processed_filename)
+
+    with ThreadPoolExecutor() as executor:
         if title_type == MEDIA_TYPE_TV:
-            season_data = self.get_season_data(title)
-            print(f"season_data: {season_data}")
-
+            season_data = get_season_data(title)
             if season_data:
                 total_seasons = season_data["total_seasons"]
-                for season in range(1, total_seasons + 1):
-                    altquery_season = f"{title} S{season:02d}"
-                    print(f"Searching for '{altquery_season}'")
-                    for qualities in qualities_sets:
-                        default_opts = [
-                            ["sortvalue", "best"],
-                            ["streamtype", "torrent"],
-                            ["limitcount", "20"],
-                            ["filename", "true"],
-                            ["videoquality", ','.join(qualities)],
-                        ]
-                        self.default_opts = default_opts
-                        result = self.search(query=title, altquery=altquery_season)
-                        sorted_results = sorted(result, key=self.custom_sort, reverse=True)
-                        magnet_uris = [item.get("links", [])[0] for item in result]
-                        instant_availabilities = check_cached_instant_availabilities(magnet_uris)
-                        for item, instant_availability in zip(result, instant_availabilities):
-                            item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
-                        # if CACHE_CHECK:
-                        #     for item in result:
-                        #         magnet_uri = item.get("links", [])[0]
-                        #         instant_availability = check_instant_availability(magnet_uri)
-                        #         item["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
-                        filtered_results = [item for item in sorted_results if not (item["cached"] is False and item.get("seeds") is None)]
-                        filename = f'results/{filename_prefix}_{"_".join(qualities)}_S{season:02d}_orionoid.json'
-                        self.save_filtered_results(filtered_results, filename)
+                futures = [executor.submit(process_quality, qualities, season) for season in range(1, total_seasons + 1) for qualities in qualities_sets]
+            else:
+                print(f"Could not get season data for {title}")
+                return
 
         elif title_type == MEDIA_TYPE_MOVIE:
-            for qualities in qualities_sets:
-                default_opts = [
-                    ["sortvalue", "best"],
-                    ["streamtype", "torrent"],
-                    ["limitcount", "20"],
-                    ["filename", "true"],
-                    ["videoquality", ','.join(qualities)],
-                ]
-                self.default_opts = default_opts
-                result = self.search(query=title, altquery=title)
-                sorted_results = sorted(result, key=self.custom_sort, reverse=True)
-                first_result = sorted_results[0]
-
-                if CACHE_CHECK:
-                    magnet_uri = first_result.get("links", [])[0]
-                    instant_availability = check_instant_availability(magnet_uri)
-                    first_result["cached"] = instant_availability.get("data", {}).get("magnets", [])[0].get("instant", False)
-
-                filtered_results = [first_result] + [item for item in sorted_results[1:] if not (item["cached"] is False and item.get("seeds") is None)]
-                filename = f'results/{filename_prefix}_{"_".join(qualities)}_orionoid.json'
-                self.save_filtered_results(filtered_results, filename)
+            futures = [executor.submit(process_quality, qualities) for qualities in qualities_sets]
         else:
             print(f"Unknown type for {title}")
-        
-        end_time = time.perf_counter()
-        print(f"Finished in {end_time - start_time:0.4f} seconds")
-    
+            return
+
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except (TimeoutError, CancelledError) as exc:
+                print(f"Exception occurred in a task: {exc}")
+
+    end_time = time.perf_counter()
+    print(f"Finished in {end_time - start_time:0.4f} seconds")
+
 QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-TITLE = "Breaking Bad"
 FILENAME_PREFIX = "result"
-orion_search = OrionSearch(token=TOKEN)
-orion_search.search_best_qualities(TITLE, QUALITIES_SETS, FILENAME_PREFIX)
-print("Done")
+search_best_qualities(title="Breaking Bad", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
