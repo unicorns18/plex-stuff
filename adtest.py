@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Dict, List, Union
 from alldebrid import AllDebrid
@@ -31,4 +32,8 @@ def get_cached_instants(ad: 'AllDebrid', magnets: List[str]) -> List[Union[str, 
     return instant_values
 
 ad = AllDebrid(apikey="tXQQw2JPx8iKEyeeOoJE")
-print(get_cached_instants(ad, magnets=['magnet:?xt=urn:btih:43011d722de7397a4a9c0dcf8179ca157cda9932&dn=Breaking+Bad+Season+2+%282160p+x265+10bit+Joy%29&tr=http%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.tfile.me%2Fannounce&tr=http%3A%2F%2Fbigfoot1942.sektori.org%3A6969%2Fannounce&tr=udp%3A%2F%2Feddie4.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker4.piratux.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.trackerfix.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.pomf.se%3A80%2Fannounce&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.blackunicorn.xyz%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.ch%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.com%3A2710%2Fannounce&tr=http%3A%2F%2Fretracker.krs-ix.ru%2Fannounce&tr=udp%3A%2F%2Ftracker.piratepublic.com%3A1337%2Fannounce&tr=http%3A%2F%2Fpow7.com%2Fannounce&tr=http%3A%2F%2Ftracker.ex.ua%2Fannounce']))
+with open('raw_results/result_hd4k_orionoid_05_raw.json', 'r') as file:
+    raw_results = json.load(file)
+
+magnets = [result['links'][0] for result in raw_results]
+print(get_cached_instants(ad, magnets='magnet:?xt=urn:btih:A5D5D31D5FBB1A2E876B66AB9DD9436DB643A110&dn=Breaking+Bad+(2008)+Season+05+S05+(2160p+WEBRip+X265+HEVC+10bit+AAC+5.1+Joy)+%5BUTR%5D&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Fexodus.desync.com%3A6969'))

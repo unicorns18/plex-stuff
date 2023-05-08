@@ -1,3 +1,4 @@
+from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import gzip
 import json
@@ -388,6 +389,10 @@ def save_filtered_results(results: List[dict], filename: str, encoding: str = 'u
         for chunk in json.JSONEncoder(indent=4, sort_keys=True).iterencode(filtered_results):
             file.write(chunk)
 
+def save_raw_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
+    with open(filename, 'w', encoding=encoding) as file:
+        json.dump(results, file, indent=4, sort_keys=True)
+
 def get_cached_instants(ad: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
     checkmagnets = ad.check_magnet_instant(magnets=magnets)
     
@@ -408,7 +413,7 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
         default_opts = [
             ["sortvalue", "best"],
             ["streamtype", "torrent"],
-            ["limitcount", "20"],
+            ["limitcount", "50"],
             ["filename", "true"],
             ["videoquality", ','.join(qualities)],
         ]
@@ -421,30 +426,29 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant is not False else False
 
-        post_processed_results = [item for item in filtered_results if item["cached"] is not False]
+        post_processed_results = [item for item in filtered_results if item["cached"] is not False or (item.get("seeds") is not None and item["seeds"] > 0)]
+
         post_processed_results.sort(key=custom_sort, reverse=True)
 
         season_suffix = f"_{season:02d}" if season else ""
         post_processed_filename = f'postprocessing_results/{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
         save_filtered_results(post_processed_results, post_processed_filename)
 
-    futures = []
     with ThreadPoolExecutor() as executor:
         if title_type == MEDIA_TYPE_TV:
             season_data = get_season_data(title)
             if season_data:
                 total_seasons = season_data["total_seasons"]
-                for season in range(1, total_seasons + 1):
-                    for qualities in qualities_sets:
-                        futures.append(executor.submit(process_quality, qualities, season))
+                futures = [executor.submit(process_quality, qualities, season) for season in range(1, total_seasons + 1) for qualities in qualities_sets]
             else:
                 print(f"Could not get season data for {title}")
+                return
 
         elif title_type == MEDIA_TYPE_MOVIE:
-            for qualities in qualities_sets:
-                futures.append(executor.submit(process_quality, qualities))
+            futures = [executor.submit(process_quality, qualities) for qualities in qualities_sets]
         else:
             print(f"Unknown type for {title}")
+            return
 
         for future in as_completed(futures):
             try:
