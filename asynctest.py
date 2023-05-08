@@ -20,6 +20,7 @@ API_HOST = "https://api.orionoid.com"
 DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
 TMDB_API_KEY = "cea9c08287d26a002386e865744fafc8"
 BASE_URL = "https://api.themoviedb.org/3"
+ad = AllDebrid(apikey=DEFAULT_API_KEY)
 
 def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
     """
@@ -380,102 +381,23 @@ def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -
                 print(f"Attempt {attempt + 1} failed. Retrying in {sleep_time} seconds. Error: {exc}")
                 time.sleep(sleep_time)
 
-def save_filtered_results(results, filename, encoding='utf-8'):
-    # filtered_results = [item for item in results if not (item["cached"] is False and item.get("seeds") is None)]
+def save_filtered_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
     filtered_results = [item for item in results[1:] if item.get("seeds") is not None]
-    with open(filename, 'w', encoding=encoding) as file:
-        json.dump(filtered_results, file, indent=4, sort_keys=True)
 
-def get_cached_instants(magnets: List[str]) -> List[Union[str, bool]]:
-    ad = AllDebrid(apikey="tXQQw2JPx8iKEyeeOoJE")
+    with open(filename, 'w', encoding=encoding) as file:
+        for chunk in json.JSONEncoder(indent=4, sort_keys=True).iterencode(filtered_results):
+            file.write(chunk)
+
+def get_cached_instants(ad: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
     checkmagnets = ad.check_magnet_instant(magnets=magnets)
-    instant_values = []
-    if checkmagnets:
+    
+    if checkmagnets and checkmagnets['status'] == 'success':
         cached = checkmagnets['data']['magnets']
-        for magnet_data in cached:
-            if checkmagnets['status'] == 'success':
-                instant = magnet_data.get('instant', False)
-                instant_values.append(instant)
-            else:
-                instant_values.append(False)
+        instant_values = [magnet_data.get('instant', False) for magnet_data in cached]
     else:
         instant_values = [False] * len(magnets)
+
     return instant_values
-
-# def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_prefix: str):
-#     """
-#     Search for the best qualities of the given title and save the sorted results to a JSON file.
-#     Parameters
-#     ----------
-#     title: str
-#         The title of the media (movie or TV show) to search for.
-#     qualities_sets: List[List[str]]
-#         A list of lists containing the qualities to search for in the results.
-#     filename_prefix: str
-#         A string to use as a prefix for the output JSON files.
-#     Returns
-#     -------
-#     None
-#     """
-#     start_time = time.perf_counter()
-#     title_type = is_movie_or_tv_show(title=title, api_key=TMDB_API_KEY, api_url="https://api.themoviedb.org/3")
-
-#     if title_type == MEDIA_TYPE_TV:
-#         season_data = get_season_data(title)
-#         print(f"season_data: {season_data}")
-
-#         if season_data:
-#             total_seasons = season_data["total_seasons"]
-#             for season in range(1, total_seasons + 1):
-#                 altquery_season = f"{title} S{season:02d}"
-#                 print(f"Searching for '{altquery_season}'")
-#                 for qualities in qualities_sets:
-#                     default_opts = [
-#                         ["sortvalue", "best"],
-#                         ["streamtype", "torrent"],
-#                         ["limitcount", "20"],
-#                         ["filename", "true"],
-#                         ["videoquality", ','.join(qualities)],
-#                     ]
-#                     result = search(query=title, altquery=altquery_season, quality_opts=default_opts)
-#                     sorted_results = sorted(result, key=custom_sort, reverse=True)
-#                     filtered_results = [item for item in sorted_results[1:] if item.get("seeds") is not None]
-#                     filename = f'results/{filename_prefix}_{"_".join(qualities)}_orionoid_{season:02d}.json'
-#                     save_filtered_results(sorted_results, filename)
-
-#                     # Do post processing, (cache checking on alldebrid)
-#                     magnets = [item['links'][0] for item in filtered_results]
-#                     cached_instants = get_cached_instants(magnets)
-#                     for i, item in enumerate(filtered_results):
-#                         instant = cached_instants[i]
-#                         item["cached"] = instant if instant is not False else False
-#                         print(f"{item['title']} - {item['cached']}")
-#                     post_processed_results = [item for item in filtered_results if item["cached"] is not False]
-#                     post_processed_results = sorted(post_processed_results, key=custom_sort, reverse=True)
-#                     post_processed_filename = f'postprocessing_results/{filename_prefix}_{"_".join(qualities)}_orionoid_{season:02d}_post_processed.json'
-#                     save_filtered_results(post_processed_results, post_processed_filename)
-#         else:
-#             print(f"Could not get season data for {title}")
-
-#     elif title_type == MEDIA_TYPE_MOVIE:
-#         for qualities in qualities_sets:
-#             default_opts = [
-#                 ["sortvalue", "best"],
-#                 ["streamtype", "torrent"],
-#                 ["limitcount", "20"],
-#                 ["filename", "true"],
-#                 ["videoquality", ','.join(qualities)],
-#             ]
-#             result = search(query=title, altquery=title, quality_opts=default_opts)
-#             sorted_results = sorted(result, key=custom_sort, reverse=True)
-#             filtered_results = [item for item in sorted_results[1:] if not (item["cached"] is False and item.get("seeds") is None)]
-#             filename = f'results/{filename_prefix}_{"_".join(qualities)}_orionoid.json'
-#             save_filtered_results(filtered_results, filename)
-#     else:
-#         print(f"Unknown type for {title}")
-    
-#     end_time = time.perf_counter()
-#     print(f"Finished in {end_time - start_time:0.4f} seconds")
 
 def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_prefix: str):
     start_time = time.perf_counter()
@@ -495,7 +417,7 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
         filtered_results = [item for item in result if item.get("seeds") is not None]
 
         magnets = (item['links'][0] for item in filtered_results)
-        cached_instants = get_cached_instants(magnets)
+        cached_instants = get_cached_instants(ad, magnets)
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant is not False else False
 
@@ -527,8 +449,8 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
         for future in as_completed(futures):
             try:
                 future.result()
-            except Exception as e:
-                print(f"Exception occurred in a task: {e}")
+            except Exception as exc:
+                print(f"Exception occurred in a task: {exc}")
 
     end_time = time.perf_counter()
     print(f"Finished in {end_time - start_time:0.4f} seconds")

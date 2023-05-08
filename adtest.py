@@ -19,20 +19,16 @@ listofmagnets = ['magnet:?xt=urn:btih:33BA49B7973275AE2386EA888CE373D23CDBBA98&d
 # else:
 #     print("No cached magnets found")
 
-def get_cached_instants(magnets: List[str]) -> List[Union[str, bool]]:
-    ad = AllDebrid(apikey="tXQQw2JPx8iKEyeeOoJE")
+def get_cached_instants(ad: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
     checkmagnets = ad.check_magnet_instant(magnets=magnets)
-    instant_values = []
-    if checkmagnets:
+    
+    if checkmagnets and checkmagnets['status'] == 'success':
         cached = checkmagnets['data']['magnets']
-        for magnet_data in cached:
-            if checkmagnets['status'] == 'success':
-                instant = magnet_data.get('instant', False)
-                instant_values.append(instant)
-            else:
-                instant_values.append(False)
+        instant_values = [magnet_data.get('instant', False) for magnet_data in cached]
     else:
         instant_values = [False] * len(magnets)
+
     return instant_values
 
-print(get_cached_instants(['magnet:?xt=urn:btih:33BA49B7973275AE2386EA888CE373D23CDBBA98&dn=Breaking.Bad.S01-S05.COMPLETE.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-FraMeSToR&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337%2Fannounce&tr=udp%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Fretracker.hotplug.ru%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.birkenwald.de%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.moeking.me%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.bt4g.com%3A2095%2Fannounce&tr=udp%3A%2F%2Fmovies.zsw.ca%3A6969%2Fannounce&tr=udp%3A%2F%2Fretracker01-msk-virt.corbina.net%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.leech.ie%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.altrosky.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce&tr=http%3A%2F%2Ftracker.mywaifu.best%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.srv00.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fthouvenin.cloud%3A6969%2Fannounce&tr=udp%3A%2F%2Faarsen.me%3A6969%2Fannounce&tr=udp%3A%2F%2Fsanincode.com%3A6969%2Fannounce&tr=udp%3A%2F%2Fuploads.gamecoast.net%3A6969%2Fannounce&tr=udp%3A%2F%2Fmail.artixlinux.org%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.joybomb.tw%3A6969%2Fannounce&tr=https%3A%2F%2Ftracker.tamersunion.org%3A443%2Fannounce&tr=udp%3A%2F%2Fstatic.54.161.216.95.clients.your-server.de%3A6969%2Fannounce&tr=udp%3A%2F%2Fcpe-104-34-3-152.socal.res.rr.com%3A6969%2Fannounce&tr=https%3A%2F%2Ft1.hloli.org%3A443%2Fannounce']))
+ad = AllDebrid(apikey="tXQQw2JPx8iKEyeeOoJE")
+print(get_cached_instants(ad, magnets=['magnet:?xt=urn:btih:43011d722de7397a4a9c0dcf8179ca157cda9932&dn=Breaking+Bad+Season+2+%282160p+x265+10bit+Joy%29&tr=http%3A%2F%2Fexplodie.org%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker.tfile.me%2Fannounce&tr=http%3A%2F%2Fbigfoot1942.sektori.org%3A6969%2Fannounce&tr=udp%3A%2F%2Feddie4.nl%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker4.piratux.com%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.trackerfix.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.pomf.se%3A80%2Fannounce&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.blackunicorn.xyz%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337%2Fannounce&tr=udp%3A%2F%2Fp4p.arenabg.ch%3A1337%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969%2Fannounce&tr=udp%3A%2F%2F9.rarbg.to%3A2710%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.com%3A2710%2Fannounce&tr=http%3A%2F%2Fretracker.krs-ix.ru%2Fannounce&tr=udp%3A%2F%2Ftracker.piratepublic.com%3A1337%2Fannounce&tr=http%3A%2F%2Fpow7.com%2Fannounce&tr=http%3A%2F%2Ftracker.ex.ua%2Fannounce']))
