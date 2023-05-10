@@ -34,6 +34,7 @@ Functions
 - delete_saved_link(): Makes a request to the delete saved link endpoint and returns the response from the API.
 - recent_links(): Makes a request to the recent links endpoint and returns the response from the API.
 - purge_recent_links(): Makes a request to the purge recent links endpoint and returns the response from the API.
+- download_file_then_upload_to_alldebrid(): Downloads a file from a URL and uploads it to AllDebrid.
 
 Exceptions
 ----------
@@ -47,13 +48,15 @@ Examples
 >>> ad.ping()
 {'status': 'success', 'data': {'ping': 'pong'}}
 """
+import hashlib
 import os
 import re
 from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urljoin
+from urllib.parse import quote_plus, urljoin
 import time
 from functools import lru_cache
 import requests
+from bencodepy import decode, encode
 
 def handle_exceptions(*, exceptions):
     """
@@ -1014,6 +1017,48 @@ class AllDebrid:
             raise APIError(error["code"], error["message"])
         
         return response
+    
+    def download_file_then_upload_to_alldebrid(self, url: str) -> Dict:
+        """
+        Download a file from a url and upload it to AllDebrid.
+
+        Parameters
+        ----------
+        url : str
+            The url to download the file from.
+
+        Returns
+        -------
+        dict
+            Response of the API.
+
+        Raises
+        ------
+        APIError
+            If any error occurred while downloading the file.
+        ValueError
+            If the endpoint is not found.
+        """
+        response = requests.get(url, timeout=60, stream=True)
+        if response.status_code != 200:
+            raise ValueError(message=f"Failed to download file. Status code: {response.status_code}")
+
+        torrent_file = response.content
+        torrent_info = decode(torrent_file)
+        info_hash = self._calculate_info_hash(torrent_info)
+
+        magnet_link = self._build_magnet_link(info_hash, url)
+
+        return magnet_link
+    
+    def _calculate_info_hash(self, torrent_info: Dict) -> bytes:
+        info_data = encode(torrent_info[b'info'])
+        info_hash = hashlib.sha1(info_data).digest()
+        return info_hash
+
+    def _build_magnet_link(self, info_hash: bytes, url: str) -> str:
+        magnet_link = f"magnet:?xt=urn:btih:{info_hash.hex()}&dn={quote_plus(url)}"
+        return magnet_link
 
     def purge_recent_links(self) -> dict:
         """
