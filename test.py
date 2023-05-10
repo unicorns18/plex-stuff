@@ -262,7 +262,8 @@
 # search_best_qualities(title="Breaking Bad", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
 
-times = [4.8318, 4.6963, 4.8555, 4.9012, 4.7215, 4.7813, 4.7102, 4.9470, 4.7385, 4.7464]
+times = [4.7314, 4.6361, 5.2488, 4.8942, 4.6120, 4.5336, 4.9693, 4.7078, 4.7206, 4.6949]
 average_time = sum(times) / len(times)
 print(f"Average time: {average_time:.4f} seconds")
+
 
