@@ -261,13 +261,27 @@
 # FILENAME_PREFIX = "result"
 # search_best_qualities(title="Breaking Bad", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
-import logging
-import requests
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logging.getLogger("requests").setLevel(logging.DEBUG)
-logging.getLogger("urllib3").setLevel(logging.DEBUG)
+import json
+import os
+from orionoid import search_best_qualities
 
-# Example request
-response = requests.get('https://api.github.com')
+
+QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+FILENAME_PREFIX = "result"
+search_best_qualities(title="Dungeons & Dragons: Honor Among Thieves", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+
+items = []
+for filename in os.listdir("postprocessing_results/"):
+    with open(os.path.join("postprocessing_results/", filename), "r") as f:
+        data = json.load(f)
+        items.append(data[0])
+
+for item in items:
+    title = item["title"]
+    score = item["score"]
+    quality = item["quality"]
+    seeds = item["seeds"]
+    size = item["size"]
+    link = item["links"][0]
+    

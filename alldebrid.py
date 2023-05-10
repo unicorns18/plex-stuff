@@ -49,7 +49,6 @@ Examples
 {'status': 'success', 'data': {'ping': 'pong'}}
 """
 import hashlib
-import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Union

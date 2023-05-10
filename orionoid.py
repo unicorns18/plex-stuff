@@ -2,6 +2,7 @@
 """
 TODO: Write a docstring
 """
+import cProfile
 from functools import lru_cache
 from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 import gzip
@@ -18,6 +19,7 @@ from alldebrid import AllDebrid
 
 from filters import clean_title
 from tmdb import MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV, is_movie_or_tv_show
+from uploader import process_magnet
 
 session = requests.Session()
 TOKEN = "ZZBAYPMQTXGGVHPKZJO5Y4SQJO3NA3XE7WBJLN67DOA3TLLQ3A7VMP532XSIDGKRPNQPCHNEV5HUGTD4UEU5IE6FBP4N7VV3ZZBKM6LZRUZ2WM7KKDKIYFJLV6C26JHA"
@@ -316,6 +318,28 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
     end_time = time.perf_counter()
     print(f"Finished in {end_time - start_time:0.4f} seconds")
 
-QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-FILENAME_PREFIX = "result"
-search_best_qualities(title="The Incredibles 2", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+def main():
+    # starttime = time.perf_counter()
+    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+    FILENAME_PREFIX = "result"
+    search_best_qualities(title="Dungeons & Dragons: Honor Among Thieves", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+
+    items = []
+    for filename in os.listdir("postprocessing_results/"):
+        with open(os.path.join("postprocessing_results/", filename), "r") as f:
+            data = json.load(f)
+            items.append(data[0])
+
+    for item in items:
+        title = item["title"]
+        link = item["links"][0]
+        quality = item["quality"]
+        print(f"Downloading {title} from {link} in {quality} quality.")
+
+        process_magnet(link)
+
+    # endtime = time.perf_counter()
+    # print(f"Finished in {endtime - starttime:0.4f} seconds (orionoid.py)")
+
+if __name__ == "__main__":
+    cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
