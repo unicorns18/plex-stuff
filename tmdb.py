@@ -55,9 +55,11 @@ TODO: Add docstring.
 #         elif result.get("media_type") == MEDIA_TYPE_TV:
 #             return MEDIA_TYPE_TV
 #     return None
+from functools import lru_cache
 import logging
 from typing import Optional
 from urllib.parse import urljoin
+import httpx
 
 import requests
 TMDB_API_KEY = "cea9c08287d26a002386e865744fafc8"
@@ -92,20 +94,18 @@ def is_movie_or_tv_show(title: str, api_key: str, api_url: str) -> Optional[str]
     else:
         return None
 
-def make_api_request(title: str, api_key: str, api_url: str) -> Optional[requests.Response]:
-    """
-    TODO: Add docstring.
-    """
+@lru_cache(maxsize=None)
+def make_api_request(title: str, api_key: str, api_url: str) -> Optional[httpx.Response]:
     endpoint = "3/search/multi"
     params = {
         "api_key": api_key,
         "query": title,
     }
     try:
-        response = requests.get(urljoin(api_url, endpoint), params=params, timeout=TIMEOUT)
+        response = httpx.get(urljoin(api_url, endpoint), params=params, timeout=TIMEOUT)
         response.raise_for_status()
         return response
-    except (requests.RequestException, requests.HTTPError) as exc:
+    except (httpx.RequestError, httpx.HTTPStatusError) as exc:
         logging.error("Error while checking title %s: %s", title, exc)
         return None
 

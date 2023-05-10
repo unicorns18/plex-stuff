@@ -262,26 +262,7 @@
 # search_best_qualities(title="Breaking Bad", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
 
-import json
-import os
-from orionoid import search_best_qualities
+times = [4.8318, 4.6963, 4.8555, 4.9012, 4.7215, 4.7813, 4.7102, 4.9470, 4.7385, 4.7464]
+average_time = sum(times) / len(times)
+print(f"Average time: {average_time:.4f} seconds")
 
-
-QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-FILENAME_PREFIX = "result"
-search_best_qualities(title="Dungeons & Dragons: Honor Among Thieves", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
-
-items = []
-for filename in os.listdir("postprocessing_results/"):
-    with open(os.path.join("postprocessing_results/", filename), "r") as f:
-        data = json.load(f)
-        items.append(data[0])
-
-for item in items:
-    title = item["title"]
-    score = item["score"]
-    quality = item["quality"]
-    seeds = item["seeds"]
-    size = item["size"]
-    link = item["links"][0]
-    

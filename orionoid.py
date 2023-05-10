@@ -3,7 +3,7 @@
 TODO: Write a docstring
 """
 import cProfile
-from functools import lru_cache
+from functools import lru_cache, partial
 from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 import gzip
 import json
@@ -18,7 +18,7 @@ from requests import session
 from alldebrid import AllDebrid
 
 from filters import clean_title
-from tmdb import MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV, is_movie_or_tv_show
+from tmdb import MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV
 from uploader import process_magnet
 
 session = requests.Session()
@@ -86,7 +86,7 @@ def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -
         total = response["data"]["count"]["total"]
         retrieved = response["data"]["count"]["retrieved"]
 
-        print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
+        # print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
 
     return match, total, retrieved
 
@@ -129,7 +129,7 @@ def search(query: str, altquery: str, quality_opts) -> Optional[Dict]:
         print("data not found in response")
         return None
 
-    print("data found in response, streams found in data, continuing...")
+    # print("data found in response, streams found in data, continuing...")
     match, total, retrieved = extract_match_type_total_retrieved(response, query, type_) #pylint: disable=W0612
     scraped_releases = extract_scraped_releases(response)
 
@@ -238,16 +238,15 @@ def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Unio
 
     return instant_values
 
-def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_prefix: str):
+def search_best_qualities(title: str, title_type: str, qualities_sets: List[List[str]], filename_prefix: str):
     start_time = time.perf_counter()
-    title_type = is_movie_or_tv_show(title=title, api_key=TMDB_API_KEY, api_url="https://api.themoviedb.org/3")
 
     def process_quality(qualities: List[str], season: Optional[int] = None):
-        altquery = title if title_type == MEDIA_TYPE_MOVIE else f"{title} S{season:02d}"
+        altquery = title if title_type == "movie" else f"{title} S{season:02d}"
         default_opts = [
             ["sortvalue", "best"],
             ["streamtype", "torrent"],
-            ["limitcount", "50"],
+            ["limitcount", "20"],
             ["filename", "true"],
             ["videoquality", ','.join(qualities)],
         ]
@@ -260,40 +259,38 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant is not False else False
 
-        post_processed_results = [item for item in filtered_results if item["cached"] is not False]
+        # post_processed_results = [item for item in filtered_results if item["cached"] is not False]
+        post_processed_results = [item for item in filtered_results if item["cached"]]
+
+        custom_sort = partial(sorted, key=lambda item: (item["cached"], item["seeds"], item["size"]), reverse=True)
+        custom_sort_size_and_seeds = partial(sorted, key=lambda item: (item["size"], item["seeds"]), reverse=True)
 
         if not post_processed_results:
-            post_processed_results = [item for item in filtered_results if item["seeds"] > 5 and item.get("seeds") is not None]
-            post_processed_results.sort(key=custom_sort_size_and_seeds, reverse=True)
+            # post_processed_results = [item for item in filtered_results if item["seeds"] > 5 and item.get("seeds") is not None]
+            # post_processed_results.sort(key=custom_sort_size_and_seeds, reverse=True)
+            post_processed_results = custom_sort_size_and_seeds(filtered_results)
         else:
-            post_processed_results.sort(key=custom_sort, reverse=True)
+            post_processed_results = custom_sort(post_processed_results)
+            # post_processed_results.sort(key=custom_sort, reverse=True)
 
         season_suffix = f"_{season:02d}" if season else ""
         post_processed_filename = f'postprocessing_results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
         save_filtered_results(post_processed_results, post_processed_filename)
 
         titles = {}
-        with open(post_processed_filename, 'r') as f:
-            data = json.load(f)
-            for r in data:
-                item_title = r['title']
-                size = r['size']
-                if item_title not in titles:
-                    titles[item_title] = getReleaseTags(item_title, size)
-                else:
-                    titles[item_title]['score'] += size
+        for r in post_processed_results:
+            item_title = r['title']
+            size = r['size']
+            if item_title not in titles:
+                titles[item_title] = getReleaseTags(item_title, size)
+            else:
+                titles[item_title]['score'] += size
 
         titles = {k: v for k, v in sorted(titles.items(), key=lambda item: item[1]['score'], reverse=True)}
 
-        for item in data:
-            item_title = item['title']
-            if item_title in titles:
-                item['score'] = titles[item_title]['score']
+        return post_processed_results
 
-        with open(post_processed_filename, 'w') as f:
-            json.dump(data, f, indent=4)
-
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:
         if title_type == MEDIA_TYPE_TV:
             season_data = get_season_data(title)
             if season_data:
@@ -309,9 +306,10 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
             print(f"Unknown type for {title}")
             return
 
+        post_processed_results_list = []
         for future in as_completed(futures):
             try:
-                future.result()
+                post_processed_results_list.append(future.result())
             except (TimeoutError, CancelledError) as exc:
                 print(f"Exception occurred in a task: {exc}")
 
@@ -322,21 +320,21 @@ def main():
     # starttime = time.perf_counter()
     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
     FILENAME_PREFIX = "result"
-    search_best_qualities(title="Dungeons & Dragons: Honor Among Thieves", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+    search_best_qualities(title="Dungeons & Dragons: Honor Among Thieves", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
-    items = []
-    for filename in os.listdir("postprocessing_results/"):
-        with open(os.path.join("postprocessing_results/", filename), "r") as f:
-            data = json.load(f)
-            items.append(data[0])
+    # items = []
+    # for filename in os.listdir("postprocessing_results/"):
+    #     with open(os.path.join("postprocessing_results/", filename), "r") as f:
+    #         data = json.load(f)
+    #         items.append(data[0])
 
-    for item in items:
-        title = item["title"]
-        link = item["links"][0]
-        quality = item["quality"]
-        print(f"Downloading {title} from {link} in {quality} quality.")
+    # for item in items:
+    #     title = item["title"]
+    #     link = item["links"][0]
+    #     quality = item["quality"]
+    #     print(f"Downloading {title} from {link} in {quality} quality.")
 
-        process_magnet(link)
+    #     process_magnet(link)
 
     # endtime = time.perf_counter()
     # print(f"Finished in {endtime - starttime:0.4f} seconds (orionoid.py)")
