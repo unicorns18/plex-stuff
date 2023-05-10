@@ -6,6 +6,7 @@ from functools import lru_cache
 from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 import gzip
 import json
+import os
 import re
 import time
 from typing import Dict, List, Optional, Tuple, Union
@@ -116,7 +117,6 @@ def search(query: str, altquery: str, quality_opts) -> Optional[Dict]:
     season_number, episode_number = extract_season_episode(altquery, type_)
     opts = add_season_episode(opts, season_number, episode_number)
     url = build_url(TOKEN, query, type_, opts, debridresolve="alldebrid")
-    print(url)
     response = session.get(url).json()
 
     if not response_is_successful(response):
@@ -137,11 +137,42 @@ def search(query: str, altquery: str, quality_opts) -> Optional[Dict]:
 
     return scraped_releases
 
+def custom_sort_size_and_seeds(item: Dict[str, Union[float, int]]) -> Tuple[float, int]:
+    size_weight = item.get("size", 0) or 0
+    seeds_weight = item.get("seeds", 0) or 0
+    return (size_weight, seeds_weight)
+
 def custom_sort(item: Dict[str, Union[float, int]]) -> Tuple[float, int]:
     size_weight = item.get("size", 0) or 0
     seeds_weight = item.get("seeds", 0) or 0
     instant_weight = int(not item.get("cached", False))
     return (size_weight, instant_weight, seeds_weight)
+
+def getReleaseTags(title: str, fileSize: int) -> Dict[str, Union[bool, int]]:
+    remux = bool(re.search(r'remux|bdrip', title, re.IGNORECASE))
+    proper_remux = bool(re.search(r'\d{4}.*\bproper\b', title, re.IGNORECASE))
+    dolby_vision = bool(re.search(r'\bDV\b|\bDoVi\b', title, re.IGNORECASE))
+    hdr10plus = bool(re.search(r'\bHDR10plus\b', title, re.IGNORECASE))
+    hdr = remux or dolby_vision or hdr10plus or bool(re.search(r'\bhdr\b|\bVISIONPLUSHDR\b', title, re.IGNORECASE))
+
+    score = fileSize
+    if remux:
+        score += 25
+    if dolby_vision or hdr10plus:
+        score += 15
+    if hdr:
+        score += 5
+    if proper_remux:
+        score += 2
+
+    return {
+        'dolby_vision': dolby_vision,
+        'hdr10plus': hdr10plus,
+        'hdr': hdr,
+        'remux': remux,
+        'proper_remux': proper_remux,
+        'score': score,
+    }
 
 @lru_cache(maxsize=100)
 def get_tv_show_data(url: str, custom_session: Optional[requests.Session] = None) -> Optional[Dict]:
@@ -187,6 +218,9 @@ def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -
 def save_filtered_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
     filtered_results = [item for item in results[1:] if item.get("seeds") is not None]
 
+    if not os.path.exists(os.path.dirname(filename)):
+        os.makedirs(os.path.dirname(filename))
+
     with open(filename, 'w', encoding=encoding, buffering=8192) as file:
         for chunk in json.JSONEncoder(indent=4, sort_keys=True).iterencode(filtered_results):
             file.write(chunk)
@@ -224,13 +258,38 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant is not False else False
 
-        post_processed_results = [item for item in filtered_results if item["cached"] is not False or (item.get("seeds") is not None and item["seeds"] > 0)]
+        post_processed_results = [item for item in filtered_results if item["cached"] is not False]
 
-        post_processed_results.sort(key=custom_sort, reverse=True)
+        if not post_processed_results:
+            post_processed_results = [item for item in filtered_results if item["seeds"] > 5 and item.get("seeds") is not None]
+            post_processed_results.sort(key=custom_sort_size_and_seeds, reverse=True)
+        else:
+            post_processed_results.sort(key=custom_sort, reverse=True)
 
         season_suffix = f"_{season:02d}" if season else ""
-        post_processed_filename = f'postprocessing_results/{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
+        post_processed_filename = f'postprocessing_results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
         save_filtered_results(post_processed_results, post_processed_filename)
+
+        titles = {}
+        with open(post_processed_filename, 'r') as f:
+            data = json.load(f)
+            for r in data:
+                item_title = r['title']
+                size = r['size']
+                if item_title not in titles:
+                    titles[item_title] = getReleaseTags(item_title, size)
+                else:
+                    titles[item_title]['score'] += size
+
+        titles = {k: v for k, v in sorted(titles.items(), key=lambda item: item[1]['score'], reverse=True)}
+
+        for item in data:
+            item_title = item['title']
+            if item_title in titles:
+                item['score'] = titles[item_title]['score']
+
+        with open(post_processed_filename, 'w') as f:
+            json.dump(data, f, indent=4)
 
     with ThreadPoolExecutor() as executor:
         if title_type == MEDIA_TYPE_TV:

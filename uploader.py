@@ -44,6 +44,7 @@ def process_magnet(magnet: str) -> None:
     if magnet.startswith('http'):
         try:
             magnet = ad.download_file_then_upload_to_alldebrid(magnet)
+            print(f"Magnet: {magnet}")
         except (ValueError, APIError) as exc:
             print(f"Error downloading and uploading file to AllDebrid: {exc}")
             return
@@ -84,4 +85,4 @@ def process_magnet(magnet: str) -> None:
     print(f"Time elapsed: {end_time - start_time:0.4f} seconds")
 
 # res = ad.download_file_then_upload_to_alldebrid("https://yourbittorrent2.com/down/12537781.torrent")
-# process_magnet("magnet:?xt=urn:btih:c860ca3851388fc1f7acedb906503ccf1b3cb3e8&dn=Incredibles.2.2018.2160p.BluRay.REMUX.HEVC.TrueHD.7.1.Atmos-FGT&tr=http%3A%2F%2Ftracker.trackerfix.com%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2790&tr=udp%3A%2F%2F9.rarbg.to%3A2790")
+process_magnet("magnet:?xt=urn:btih:cf8d0ec615e705741e446887726fe80374613f2a&dn=Incredibles.2.2018.2160p.BluRay.x265.10bit.SDR.TrueHD.7.1.Atmos-SWTYBLZ&tr=http%3A%2F%2Ftracker.trackerfix.com%3A80%2Fannounce&tr=udp%3A%2F%2F9.rarbg.me%3A2800&tr=udp%3A%2F%2F9.rarbg.to%3A2860")
