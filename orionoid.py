@@ -264,28 +264,20 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant is not False else False
 
+        for item in filtered_results:
+            item_title = item['title']
+            size = item['size']
+            item['score'] = getReleaseTags(item_title, size)['score']
+
         post_processed_results = [item for item in filtered_results if item["cached"]]
 
-        custom_sort = partial(sorted, key=lambda item: (item["cached"], item["seeds"], item["size"]), reverse=True)
-        custom_sort_size_and_seeds = partial(sorted, key=lambda item: (item["size"], item["seeds"]), reverse=True)
+        custom_sort = partial(sorted, key=lambda item: (item["cached"], item["size"], item["score"], item["seeds"]), reverse=True)
+        custom_sort_size_and_seeds = partial(sorted, key=lambda item: (item["size"], item["score"], item["seeds"]), reverse=True)
 
         if not post_processed_results:
             post_processed_results = custom_sort_size_and_seeds(filtered_results)
         else:
             post_processed_results = custom_sort(post_processed_results)
-
-        titles = defaultdict(lambda: {"score": 0})  # Use defaultdict for easier score aggregation
-        for r in post_processed_results:
-            item_title = r['title']
-            size = r['size']
-            titles[item_title]['score'] += size
-
-        titles = {k: v for k, v in sorted(titles.items(), key=lambda item: item[1]['score'], reverse=True)}
-
-        for item in post_processed_results:
-            item_title = item['title']
-            if item_title in titles:
-                item['score'] = titles[item_title]['score']
 
         season_suffix = f"_{season:02d}" if season else ""
         post_processed_filename = f'postprocessing_results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
@@ -293,7 +285,8 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
 
         return post_processed_results
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    num_workers = os.cpu_count()
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
         if title_type == MEDIA_TYPE_TV:
             season_data = get_season_data(title)
             if season_data:
