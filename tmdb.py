@@ -13,7 +13,7 @@ TMDB_API_URL = "https://api.themoviedb.org/3"
 
 TIMEOUT = 10
 MEDIA_TYPE_MOVIE = "movie"
-MEDIA_TYPE_TV = "tv"
+MEDIA_TYPE_TV = "tv" or "show"
 
 def is_movie_or_tv_show(title: str, api_key: str, api_url: str) -> Optional[str]:
     """

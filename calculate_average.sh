@@ -3,7 +3,7 @@
 read -p "Enter the num of times to run the script: " num_times
 #read -p "Enter the name of the script to run: " script_name
 
-output=$(for i in {1..$num_times}; do python test.py; done)
+output=$(for i in {1..$num_times}; do python orionoid.py; done)
 
 times=$(echo "$output" | grep -o 'Finished in [0-9.]\+ seconds' | grep -o '[0-9.]\+')
 

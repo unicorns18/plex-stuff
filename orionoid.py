@@ -5,7 +5,7 @@ TODO: Write a docstring
 import cProfile
 from collections import namedtuple
 from functools import lru_cache, partial
-from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
+from concurrent.futures import CancelledError, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import gzip
 import io
 import json
@@ -40,61 +40,48 @@ def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
         altquery = query
     return query, altquery
 
+SEASON_EPISODE_REGEX = re.compile(r'(S[0-9]|complete|S\?[0-9])', re.I)
 def determine_type(altquery: str) -> str:
-    return "show" if re.search(r'(S[0-9]|complete|S\?[0-9])', altquery, re.I) else "movie"
+    return "show" if SEASON_EPISODE_REGEX.search(altquery) else "movie"
 
 def build_opts(default_opts) -> str:
     return '&'.join(['='.join(opt) for opt in default_opts])
 
+SEASON_REGEX = re.compile(r'S(\d+)', re.I)
+EPISODE_REGEX = re.compile(r'E(\d+)', re.I)
 def extract_season_episode(altquery: str, type_: str) -> Tuple[Optional[str], Optional[str]]:
-    if type_ == "show":
-        season_number = re.search(r'(?<=S)([0-9]+)', altquery, re.I)
-        episode_number = re.search(r'(?<=E)([0-9]+)', altquery, re.I)
-        return (season_number.group() if season_number else None, episode_number.group() if episode_number else None)
+    if type_ == "show" or type_ == "tv":
+        season_number = SEASON_REGEX.findall(altquery)
+        episode_number = EPISODE_REGEX.findall(altquery)
+        return (season_number[0] if season_number else None, episode_number[0] if episode_number else None)
     return None, None
 
 def add_season_episode(opts: str, season_number: Optional[str], episode_number: Optional[str]) -> str:
-    if season_number is not None and int(season_number) != 0:
-        opts += f"&numberseason={int(season_number)}"
-        if episode_number is not None and int(episode_number) != 0:
-            opts += f"&numberepisode={int(episode_number)}"
+    if season_number and season_number != '0':
+        opts = f"{opts}&numberseason={season_number}"
+        if episode_number and episode_number != '0':
+            opts = f"{opts}&numberepisode={episode_number}"
     return opts
 
-def build_url(token: str, query: str, type_: str, opts: str, debridresolve: str = "user") -> str:
-    if re.search(r'(tt[0-9]+)', query, re.I):
-        idimdb = query[2:]
-        query_params = urlencode({'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_, 'idimdb': idimdb})
+BASE_URL_ORIONOID = 'https://api.orionoid.com'
+
+def build_url(token: str, query: str, type_: str, opts: str) -> str:
+    params = {'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_}
+
+    if query.startswith('tt'):
+        params['idimdb'] = query[2:]
     else:
-        query_params = urlencode({'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_, 'query': query})
+        params['query'] = query
 
-    if debridresolve:
-        query_params += f"&debridlookup={debridresolve}"
-
-    return f'https://api.orionoid.com?{query_params}&{opts}'
+    query_params = urlencode(params)
+    return f'{BASE_URL_ORIONOID}?{query_params}&{opts}'
 
 def response_is_successful(response: dict) -> bool:
     return response.get('result', {}).get('status') == 'success'
 
 def response_has_data(response: dict) -> bool:
-    return bool(response.get("data", {}).get("streams"))
+    return "data" in response and "streams" in response["data"]
 
-# def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -> Tuple[str, int, int]:
-#     match = "None"
-#     total = 0
-#     retrieved = 0
-
-#     if "data" in response:
-#         if "movie" in response["data"]:
-#             match = response["data"]["movie"]["meta"]["title"] + ' ' + str(response["data"]["movie"]["meta"]["year"])
-#         elif "show" in response["data"]:
-#             match = response["data"]["show"]["meta"]["title"] + ' ' + str(response["data"]["show"]["meta"]["year"])
-
-#         total = response["data"]["count"]["total"]
-#         retrieved = response["data"]["count"]["retrieved"]
-
-#         print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
-
-#     return match, total, retrieved
 def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -> Tuple[Optional[str], int, int]:
     NONE = "None"
     MOVIE = "movie"
@@ -156,13 +143,12 @@ def search(query: str, altquery: str, quality_opts) -> Optional[Dict]:
     opts = build_opts(quality_opts)
     season_number, episode_number = extract_season_episode(altquery, type_)
     opts = add_season_episode(opts, season_number, episode_number)
-    url = build_url(TOKEN, query, type_, opts, debridresolve="alldebrid")
+    url = build_url(TOKEN, query, type_, opts)
     response = session.get(url).json()
-    print(url)
 
     if not response_is_successful(response):
         print("Error: Did not receive a successful response from the server.")
-        return 
+        return []
 
     if not response_has_data(response):
         print("data not found in response")
@@ -240,10 +226,12 @@ redis_db = 0
 redis_connection = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 requests_cache.install_cache(f'{caches_path}tv_show_cache', expire_after=3600, backend='redis', connection=redis_connection)
 
-def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -> Optional[Dict]:
-    search_params = {"api_key": TMDB_API_KEY, "query": title}
-    search_url = f"{BASE_URL}/search/tv?{urlencode(search_params)}"
-
+def get_season_data(title: str = None, retries: int = 3, backoff_factor: float = 2.0) -> Optional[Dict]:
+    if re.match(r'tt\d{7,8}', title):
+        return get_season_data_imdb(title, retries, backoff_factor)
+    else:
+        return get_season_data_title(title, retries, backoff_factor)
+def get_season_data_imdb(imdb_id: str, retries: int, backoff_factor: float) -> Optional[Dict]:
     retry_strategy = Retry(total=retries, backoff_factor=backoff_factor)
     adapter = HTTPAdapter(max_retries=retry_strategy)
 
@@ -251,47 +239,76 @@ def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -
         req_session.mount("https://", adapter)
         req_session.mount("http://", adapter)
 
-        hostname = urlparse(BASE_URL).hostname
-
-        if hostname not in hostname_cache:
-            hostname_cache[hostname] = resolve_hostname(hostname)
-        ip_address = hostname_cache[hostname]
-        headers = {"Host": hostname, "X-Forwarded-For": ip_address}
-
         try:
-            cache_key = f"{title}-{TMDB_API_KEY}"
-
-            if cache_key not in response_cache:
-                response_cache[cache_key] = req_session.get(search_url, timeout=10, headers=headers, verify=False)
-            response = response_cache[cache_key]
-
+            search_params = {"api_key": TMDB_API_KEY, "external_source": "imdb_id"}
+            search_url = f"{BASE_URL}/find/{imdb_id}?{urlencode(search_params)}"
+            
+            response = req_session.get(search_url, timeout=10, verify=False)
             response.raise_for_status()
             search_data = sj.loads(response.content)
-            tv_show = search_data.get("results", [])[0] if search_data.get("results") else None
 
-            if tv_show:
+            tv_results = search_data.get("tv_results", [])
+            if tv_results:
+                tv_show = tv_results[0]
                 tv_show_id = tv_show["id"]
                 tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
 
-                tv_show_cache_key = f"{tv_show_id}-{TMDB_API_KEY}"
-
-                if tv_show_cache_key not in response_cache:
-                    response_cache[tv_show_cache_key] = req_session.get(tv_show_url, timeout=10, headers=headers, verify=False)
-                tv_show_response = response_cache[tv_show_cache_key]
+                tv_show_response = req_session.get(tv_show_url, timeout=10, verify=False)
                 tv_show_response.raise_for_status()
                 tv_show_data = sj.loads(tv_show_response.content)
+                
+                return {"total_seasons": tv_show_data.get("number_of_seasons")} if tv_show_data else None
+        except requests.exceptions.RequestException as exc:
+            print(f"Error: {exc}")
+            return None
+
+def get_season_data_title(title: str, retries: int, backoff_factor: float) -> Optional[Dict]:
+    retry_strategy = Retry(total=retries, backoff_factor=backoff_factor)
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+
+    with requests.Session() as req_session:
+        req_session.mount("https://", adapter)
+        req_session.mount("http://", adapter)
+
+        try:
+            search_params = {"api_key": TMDB_API_KEY, "query": title}
+            search_url = f"{BASE_URL}/search/tv?{urlencode(search_params)}"
+            
+            response = req_session.get(search_url, timeout=10, verify=False)
+            response.raise_for_status()
+            search_data = sj.loads(response.content)
+
+            results = search_data.get("results", [])
+            if results:
+                tv_show = results[0]
+                tv_show_id = tv_show["id"]
+                tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
+
+                tv_show_response = req_session.get(tv_show_url, timeout=10, verify=False)
+                tv_show_response.raise_for_status()
+                tv_show_data = sj.loads(tv_show_response.content)
+                
                 return {"total_seasons": tv_show_data.get("number_of_seasons")} if tv_show_data else None
         except requests.exceptions.RequestException as exc:
             print(f"Error: {exc}")
             return None
 
 def save_filtered_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
-    filtered_results = [item for item in results[1:] if item.get("seeds") is not None]
+    if not filename:
+        raise ValueError("Filename must not be empty")
 
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    # print(f"Saving results. Length of results: {len(results)}")
+    # print(f"Results: {results}")
 
-    with io.open(filename, 'w', encoding=encoding, buffering=8192) as file:
-        json.dump(filtered_results, file, indent=4, sort_keys=True)
+    directory = os.path.dirname(filename)
+    if directory and not os.path.exists(os.path.dirname(filename)):
+        os.makedirs(directory)
+
+    filtered_results = [item for item in results if item.get("seeds") is not None]
+
+    with open(filename, 'w', encoding=encoding, buffering=8192) as file:
+        for chunk in json.JSONEncoder(indent=4, sort_keys=True).iterencode(filtered_results):
+            file.write(chunk)
 
 def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
     checkmagnets = alldebrid.check_magnet_instant(magnets=magnets)
@@ -317,7 +334,7 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
         magnets = (item['links'][0] for item in filtered_results)
         cached_instants = get_cached_instants(ad, magnets)
         for item, instant in zip(filtered_results, cached_instants):
-            item["cached"] = instant if instant is not False else False
+            item["cached"] = instant if instant else False
 
         for item in filtered_results:
             item_title = item['title']
@@ -336,17 +353,23 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
 
         season_suffix = f"_{season:02d}" if season else ""
         post_processed_filename = f'postprocessing_results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
-        save_filtered_results(post_processed_results, post_processed_filename)
+        results_to_save = post_processed_results if post_processed_results else filtered_results
+        save_filtered_results(results_to_save, post_processed_filename)
 
         return post_processed_results
     
     num_workers = os.cpu_count()
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        if title_type == MEDIA_TYPE_TV:
+        if title_type == MEDIA_TYPE_TV or title_type == "show":
             season_data = get_season_data(title)
             if season_data:
                 total_seasons = season_data["total_seasons"]
-                futures = [executor.submit(process_quality, qualities, season) for season in range(1, total_seasons + 1) for qualities in qualities_sets]
+                futures = []
+                for season in range(1, total_seasons + 1):
+                    for qualities in qualities_sets:
+                        future = executor.submit(process_quality, qualities, season)
+                        futures.append(future)
+                # futures = [executor.submit(process_quality, qualities, season) for season in range(1, total_seasons + 1) for qualities in qualities_sets]
             else:
                 print(f"Could not get season data for {title}")
                 return
@@ -357,10 +380,9 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
             print(f"Unknown type for {title}")
             return
 
-        post_processed_results_list = []
         for future in as_completed(futures):
             try:
-                post_processed_results_list.append(future.result())
+                future.result()
             except (TimeoutError, CancelledError) as exc:
                 print(f"Exception occurred in a task: {exc}")
 
@@ -370,7 +392,11 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
 def main():
     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
     FILENAME_PREFIX = "result"
-    search_best_qualities(title="The Bodyguard 1992", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+    # breaking bad = tt0903747
+    # incredibles 2 = tt3606756
+    # res_title = get_season_data("breaking bad")
+    # res_imdb = get_season_data("tt0903747")
+    search_best_qualities(title="tt0903747", title_type="show", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
 if __name__ == "__main__":
     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")

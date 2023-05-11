@@ -5,25 +5,27 @@ TODO: Write a docstring
 import cProfile
 from collections import namedtuple
 from functools import lru_cache, partial
-from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
+from concurrent.futures import CancelledError, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import gzip
+import io
 import json
 import os
 import re
 import time
 from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode, urlparse
-import dns
 import ijson
 import redis
 import requests
 from requests import session
 import requests_cache
-from urllib3 import Retry
+import urllib3
 from alldebrid import AllDebrid
 
 from filters import clean_title
 from tmdb import MEDIA_TYPE_MOVIE, MEDIA_TYPE_TV
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 session = requests.Session()
 TOKEN = "ZZBAYPMQTXGGVHPKZJO5Y4SQJO3NA3XE7WBJLN67DOA3TLLQ3A7VMP532XSIDGKRPNQPCHNEV5HUGTD4UEU5IE6FBP4N7VV3ZZBKM6LZRUZ2WM7KKDKIYFJLV6C26JHA"
@@ -31,7 +33,6 @@ API_HOST = "https://api.orionoid.com"
 DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
 TMDB_API_KEY = "cea9c08287d26a002386e865744fafc8"
 BASE_URL = "https://api.themoviedb.org/3"
-BASE_URL_ORIONOID = 'https://api.orionoid.com'
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
 
 def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
@@ -39,30 +40,30 @@ def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
         altquery = query
     return query, altquery
 
+SEASON_EPISODE_REGEX = re.compile(r'(S[0-9]|complete|S\?[0-9])', re.I)
 def determine_type(altquery: str) -> str:
-    TV_SHOW_PATTERN = r'(S[0-9]|complete|S\?[0-9])'
-    return "tv" if re.search(TV_SHOW_PATTERN, altquery, re.I) else "movie"
+    return "show" if SEASON_EPISODE_REGEX.search(altquery) else "movie"
 
 def build_opts(default_opts) -> str:
     return '&'.join(['='.join(opt) for opt in default_opts])
 
+SEASON_REGEX = re.compile(r'S(\d+)', re.I)
+EPISODE_REGEX = re.compile(r'E(\d+)', re.I)
 def extract_season_episode(altquery: str, type_: str) -> Tuple[Optional[str], Optional[str]]:
-    if type_ == "tv":
-        season_number = re.findall(r'S(\d+)', altquery, re.I)
-        episode_number = re.findall(r'E(\d+)', altquery, re.I)
+    if type_ == "show" or type_ == "tv":
+        season_number = SEASON_REGEX.findall(altquery)
+        episode_number = EPISODE_REGEX.findall(altquery)
         return (season_number[0] if season_number else None, episode_number[0] if episode_number else None)
     return None, None
 
 def add_season_episode(opts: str, season_number: Optional[str], episode_number: Optional[str]) -> str:
-    if season_number:
-        season_num = int(season_number)
-        if season_num != 0:
-            opts = f"{opts}&numberseason={season_num}"
-            if episode_number:
-                episode_num = int(episode_number)
-                if episode_num != 0:
-                    opts = f"{opts}&numberepisode={episode_num}"
+    if season_number and season_number != '0':
+        opts = f"{opts}&numberseason={season_number}"
+        if episode_number and episode_number != '0':
+            opts = f"{opts}&numberepisode={episode_number}"
     return opts
+
+BASE_URL_ORIONOID = 'https://api.orionoid.com'
 
 def build_url(token: str, query: str, type_: str, opts: str) -> str:
     params = {'token': token, 'mode': 'stream', 'action': 'retrieve', 'type': type_}
@@ -79,7 +80,7 @@ def response_is_successful(response: dict) -> bool:
     return response.get('result', {}).get('status') == 'success'
 
 def response_has_data(response: dict) -> bool:
-    return bool(response.get("data", {}).get("streams"))
+    return "data" in response and "streams" in response["data"]
 
 def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -> Tuple[Optional[str], int, int]:
     NONE = "None"
@@ -110,7 +111,7 @@ def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -
         total = count.get(TOTAL, 0)
         retrieved = count.get(RETRIEVED, 0)
 
-        # print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
+        print(f"Match: '{query}' to {type_} '{match}' - found {total} releases (total), retrieved {retrieved}")
 
     return match, total, retrieved
 
@@ -119,7 +120,7 @@ def extract_scraped_releases(response: dict) -> List[Dict]:
 
     for res in response["data"]["streams"]:
         title = clean_title(res['file']['name'].split('\n')[0].replace(' ', '.'))
-        size = (float(res["file"]["size"]) / 1000000000 if res["file"].get("size") else 0)
+        size = (float(res["file"]["size"]) / 1000000000 if "size" in res["file"] else 0)
         links = res["links"]
         seeds = res["stream"]["seeds"] if "stream" in res and "seeds" in res["stream"] else 0
         source = res["stream"]["source"] if "stream" in res and "source" in res["stream"] else ""
@@ -150,7 +151,7 @@ def search(query: str, altquery: str, quality_opts) -> Optional[Dict]:
         return []
 
     if not response_has_data(response):
-        # print("data not found in response")
+        print("data not found in response")
         return []
 
     # print("data found in response, streams found in data, continuing...")
@@ -202,9 +203,10 @@ def getReleaseTags(title: str, fileSize: int) -> Dict[str, Union[bool, int]]:
 
     return ReleaseTags(dolby_vision, hdr10plus, hdr, remux, proper_remux, score)
 
-
 from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import simdjson as sj
+import dns.resolver
 
 @lru_cache(maxsize=128)
 def resolve_hostname(hostname: str) -> str:
@@ -224,10 +226,12 @@ redis_db = 0
 redis_connection = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 requests_cache.install_cache(f'{caches_path}tv_show_cache', expire_after=3600, backend='redis', connection=redis_connection)
 
-def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -> Optional[Dict]:
-    search_params = {"api_key": TMDB_API_KEY, "query": title}
-    search_url = f"{BASE_URL}/search/tv?{urlencode(search_params)}"
-
+def get_season_data(title: str = None, retries: int = 3, backoff_factor: float = 2.0) -> Optional[Dict]:
+    if re.match(r'tt\d{7,8}', title):
+        return get_season_data_imdb(title, retries, backoff_factor)
+    else:
+        return get_season_data_title(title, retries, backoff_factor)
+def get_season_data_imdb(imdb_id: str, retries: int, backoff_factor: float) -> Optional[Dict]:
     retry_strategy = Retry(total=retries, backoff_factor=backoff_factor)
     adapter = HTTPAdapter(max_retries=retry_strategy)
 
@@ -235,35 +239,55 @@ def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -
         req_session.mount("https://", adapter)
         req_session.mount("http://", adapter)
 
-        hostname = urlparse(BASE_URL).hostname
-
-        if hostname not in hostname_cache:
-            hostname_cache[hostname] = resolve_hostname(hostname)
-        ip_address = hostname_cache[hostname]
-        headers = {"Host": hostname, "X-Forwarded-For": ip_address}
-
         try:
-            cache_key = f"{title}-{TMDB_API_KEY}"
-
-            if cache_key not in response_cache:
-                response_cache[cache_key] = req_session.get(search_url, timeout=10, headers=headers, verify=False)
-            response = response_cache[cache_key]
-
+            search_params = {"api_key": TMDB_API_KEY, "external_source": "imdb_id"}
+            search_url = f"{BASE_URL}/find/{imdb_id}?{urlencode(search_params)}"
+            
+            response = req_session.get(search_url, timeout=10, verify=False)
             response.raise_for_status()
             search_data = sj.loads(response.content)
-            tv_show = search_data.get("results", [])[0] if search_data.get("results") else None
 
-            if tv_show:
+            tv_results = search_data.get("tv_results", [])
+            if tv_results:
+                tv_show = tv_results[0]
                 tv_show_id = tv_show["id"]
                 tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
 
-                tv_show_cache_key = f"{tv_show_id}-{TMDB_API_KEY}"
-
-                if tv_show_cache_key not in response_cache:
-                    response_cache[tv_show_cache_key] = req_session.get(tv_show_url, timeout=10, headers=headers, verify=False)
-                tv_show_response = response_cache[tv_show_cache_key]
+                tv_show_response = req_session.get(tv_show_url, timeout=10, verify=False)
                 tv_show_response.raise_for_status()
                 tv_show_data = sj.loads(tv_show_response.content)
+                
+                return {"total_seasons": tv_show_data.get("number_of_seasons")} if tv_show_data else None
+        except requests.exceptions.RequestException as exc:
+            print(f"Error: {exc}")
+            return None
+
+def get_season_data_title(title: str, retries: int, backoff_factor: float) -> Optional[Dict]:
+    retry_strategy = Retry(total=retries, backoff_factor=backoff_factor)
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+
+    with requests.Session() as req_session:
+        req_session.mount("https://", adapter)
+        req_session.mount("http://", adapter)
+
+        try:
+            search_params = {"api_key": TMDB_API_KEY, "query": title}
+            search_url = f"{BASE_URL}/search/tv?{urlencode(search_params)}"
+            
+            response = req_session.get(search_url, timeout=10, verify=False)
+            response.raise_for_status()
+            search_data = sj.loads(response.content)
+
+            results = search_data.get("results", [])
+            if results:
+                tv_show = results[0]
+                tv_show_id = tv_show["id"]
+                tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
+
+                tv_show_response = req_session.get(tv_show_url, timeout=10, verify=False)
+                tv_show_response.raise_for_status()
+                tv_show_data = sj.loads(tv_show_response.content)
+                
                 return {"total_seasons": tv_show_data.get("number_of_seasons")} if tv_show_data else None
         except requests.exceptions.RequestException as exc:
             print(f"Error: {exc}")
@@ -272,6 +296,9 @@ def get_season_data(title: str, retries: int = 3, backoff_factor: float = 2.0) -
 def save_filtered_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
     if not filename:
         raise ValueError("Filename must not be empty")
+    
+    if results is []:
+        print("No results found")
 
     directory = os.path.dirname(filename)
     if directory and not os.path.exists(os.path.dirname(filename)):
@@ -282,46 +309,32 @@ def save_filtered_results(results: List[dict], filename: str, encoding: str = 'u
     with open(filename, 'w', encoding=encoding, buffering=8192) as file:
         for chunk in json.JSONEncoder(indent=4, sort_keys=True).iterencode(filtered_results):
             file.write(chunk)
-        
+
 def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
     checkmagnets = alldebrid.check_magnet_instant(magnets=magnets)
     instant_values = [magnet_data.get('instant', False) if checkmagnets and checkmagnets['status'] == 'success' else False for magnet_data in checkmagnets['data']['magnets']] if checkmagnets else [False] * len(magnets)
     return instant_values
 
-DEBUG = False
-
 def search_best_qualities(title: str, title_type: str, qualities_sets: List[List[str]], filename_prefix: str):
     start_time = time.perf_counter()
-    # title_type = "movie"
 
     def process_quality(qualities: List[str], season: Optional[int] = None):
         altquery = title if title_type == "movie" else f"{title} S{season:02d}"
         default_opts = [
             ["sortvalue", "best"],
             ["streamtype", "torrent"],
-            ["limitcount", "10"],
+            ["limitcount", "20"],
             ["filename", "true"],
             ["videoquality", ','.join(qualities)],
         ]
         result = search(query=title, altquery=altquery, quality_opts=default_opts)
-        # save_filtered_results(results=result, filename=f"postprocessing_results/{filename_prefix}_{altquery}_{','.join(qualities)}.json")
-            
-        if not result:
-            if title_type == "tv":
-                if DEBUG:
-                    print(f"No results found for {title} S{season:02d} {qualities}")
-            else:
-                if DEBUG:
-                    print(f"No results found for {title} {qualities}")
-            return
-        else:
-            filtered_results = [item for item in result if item.get("seeds") is not None]
+
+        filtered_results = [item for item in result if item.get("seeds") is not None]
 
         magnets = (item['links'][0] for item in filtered_results)
         cached_instants = get_cached_instants(ad, magnets)
         for item, instant in zip(filtered_results, cached_instants):
-            item["cached"] = instant if instant is not False else False
-            print(item["cached"])
+            item["cached"] = instant if instant else False
 
         for item in filtered_results:
             item_title = item['title']
@@ -340,14 +353,14 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
 
         season_suffix = f"_{season:02d}" if season else ""
         post_processed_filename = f'postprocessing_results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
-
-        save_filtered_results(post_processed_results, post_processed_filename)
+        results_to_save = post_processed_results if post_processed_results else filtered_results
+        save_filtered_results(results_to_save, post_processed_filename)
 
         return post_processed_results
-
+    
     num_workers = os.cpu_count()
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        if title_type == MEDIA_TYPE_TV:
+        if title_type == MEDIA_TYPE_TV or title_type == "show":
             season_data = get_season_data(title)
             if season_data:
                 total_seasons = season_data["total_seasons"]
@@ -374,7 +387,11 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
 def main():
     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
     FILENAME_PREFIX = "result"
-    search_best_qualities(title="tt3606756", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+    # breaking bad = tt0903747
+    # incredibles 2 = tt3606756
+    # res_title = get_season_data("breaking bad")
+    # res_imdb = get_season_data("tt0903747")
+    search_best_qualities(title="tt0903747", title_type="show", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
 if __name__ == "__main__":
     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
