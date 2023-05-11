@@ -374,7 +374,7 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
 def main():
     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
     FILENAME_PREFIX = "result"
-    search_best_qualities(title="tt0103855", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+    search_best_qualities(title="tt3606756", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
 if __name__ == "__main__":
     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
