@@ -60,6 +60,7 @@ def process_response(response: requests.Response) -> Optional[str]:
     TODO: Add docstring.
     """
     data = response.json()
+    print(data)
     if data.get("results"):
         result = data.get("results")[0]
         if result.get("media_type") == MEDIA_TYPE_MOVIE:
