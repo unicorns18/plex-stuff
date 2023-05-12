@@ -1,11 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
+import redis
 from requests.adapters import HTTPAdapter
 import requests
+import requests_cache
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+redis_cache = redis.StrictRedis(host='localhost', port=6379, db=0)
+requests_cache.install_cache('mdblist_cache', backend='redis', connection=redis_cache, expire_after=604800)
 
 def fetch_stream_data(session, imdb_id):
     streams_url = f"https://mdblist.com/api/?apikey=uwk2jbhy7acivnyzpq44hh70y&i={imdb_id}"

@@ -2,7 +2,6 @@
 """
 TODO: Write a docstring
 """
-import cProfile
 from collections import namedtuple
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor, as_completed
