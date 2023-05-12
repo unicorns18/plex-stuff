@@ -24,8 +24,22 @@ def process_magnet(magnet: str) -> None:
 
         :param link: The link to save.
         """
-        res_saved_links: Dict[str, Any] = ad.save_new_link(link=link)
-        print(res_saved_links)
+        if not link or not isinstance(link, str):
+            print(f"Invalid link: {link}")
+            return
+        
+        try:
+            res_saved_links: Dict[str, Any] = ad.save_new_link(link=link)
+            if res_saved_links['status'] == 'success':
+                print(f"Saved link: {link}")
+            else:
+                print(f"Error saving link: {link}")
+        except APIError as exc:
+            print(f"Error saving link: {link}: {exc}")
+        except ValueError as exc:
+            print(f"Error saving link: {link}: {exc}")
+        except Exception as exc:
+            print(f"Error saving link: {link}: {exc}")
 
     def filter_uptobox_links(magnet_links: List[Dict[str, str]]) -> Iterable[str]:
         """
@@ -34,8 +48,17 @@ def process_magnet(magnet: str) -> None:
         :param magnet_links: A list of magnet link dictionaries.
         :return: A generator yielding uptobox.com links.
         """
+        if not isinstance(magnet_links, list):
+            raise ValueError("The magnet_links argument must be a list.")
+    
         for link in magnet_links:
-            if 'uptobox.com' in link['link']:
+            if not isinstance(link, dict):
+                raise ValueError("Each item in magnet_links must be a dictionary.")
+            elif 'link' not in link:
+                raise ValueError("Each dictionary in magnet_links must contain a 'link' key.")
+            elif not isinstance(link['link'], str):
+                raise ValueError("The 'link' value in the dictionaries in magnet_links must be a string.")
+            elif 'uptobox.com' in link['link']:
                 yield link['link']
 
     start_time = time.perf_counter()

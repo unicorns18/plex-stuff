@@ -101,22 +101,36 @@ def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -
 def extract_scraped_releases(response: dict) -> List[Dict]:
     scraped_releases = []
 
-    for res in response["data"]["streams"]:
-        title = clean_title(res['file']['name'].split('\n')[0].replace(' ', '.'))
-        size = (float(res["file"]["size"]) / 1000000000 if "size" in res["file"] else 0)
-        links = res["links"]
-        seeds = res["stream"]["seeds"] if "stream" in res and "seeds" in res["stream"] else 0
-        source = res["stream"]["source"] if "stream" in res and "source" in res["stream"] else ""
-        quality = res["video"]["quality"] if "video" in res and "quality" in res["video"] else ""
+    try:
+        for res in response["data"]["streams"]:
+            try:
+                title = clean_title(res['file']['name'].split('\n')[0].replace(' ', '.'))
+            except Exception as e:
+                title = None
+                print(f"Error processing title: {e}")
 
-        scraped_releases.append({
-            "title": title,
-            "size": size,
-            "links": links,
-            "seeds": seeds,
-            "source": source,
-            "quality": quality
-        })
+            try:
+                size = (float(res["file"]["size"]) / 1000000000 if "size" in res["file"] and res["file"]["size"] is not None else 0)
+            except Exception as e:
+                size = 0
+                print(f"Error processing size: {e}")
+
+            links = res.get("links", [])
+            seeds = res.get("stream", {}).get("seeds", 0)
+            source = res.get("stream", {}).get("source", "")
+            quality = res.get("video", {}).get("quality", "")
+
+            scraped_releases.append({
+                "title": title,
+                "size": size,
+                "links": links,
+                "seeds": seeds,
+                "source": source,
+                "quality": quality
+            })
+
+    except Exception as e:
+        print(f"Error processing response data: {e}")
 
     return scraped_releases
 
