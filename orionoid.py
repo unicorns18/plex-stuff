@@ -128,41 +128,50 @@ def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
 SEASON_REGEX = re.compile(r'S(\d+)', re.I)
 EPISODE_REGEX = re.compile(r'E(\d+)', re.I)
     
-def search(query: str, altquery: str, type_: str, quality_opts, season_number: Optional[int] = None, max_retries: int = 20) -> Optional[Dict]:
+def search(query: str, altquery: str, type_: str, quality_opts, season_number: Optional[int] = None, max_retries: int = 3) -> Optional[Dict]:
     query, altquery = normalize_queries(query, altquery)
     opts = build_opts(quality_opts) 
-    if type_ == "show" or type_ == "tv":
+    if type_ == "show" or type_ == "tv": 
         if season_number is not None:
             opts = f"{opts}&numberseason={season_number}"
-    url = build_url(TOKEN, query, type_, opts,)
+    url = build_url(TOKEN, query, type_, opts,) 
 
     retries = 0
     while retries < max_retries:
         try:
             response = session.get(url).json()
             break
-        except ConnectionError as e:
+        except (ConnectionError, requests.Timeout, requests.TooManyRedirects) as e:
             retries += 1
-            print(f"Error: {e}. Retrying in 5 seconds. Attempt {retries} of {max_retries}")
+            print(f"Error occurred while attempting to fetch data: {e}. Retrying in 5 seconds. Attempt {retries} of {max_retries}")
             time.sleep(5)
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return {"error": str(e)}
+        finally:
+            session.close()
     else:
-        print(f"Failed to retrieve data after {max_retries} attempts.")
-        return []
-    
+        error_message = f"Failed to retrieve data after {max_retries} attempts."
+        print(error_message)
+        return {"error": error_message}
+
     if not response_is_successful(response):
-        print("Error: Did not receive a successful response from the server.")
-        return []
+        error_message = "Error: Did not receive a successful response from the server."
+        print(error_message)
+        return {"error": error_message}
 
     if not response_has_data(response):
-        print("data not found in response")
-        return []
+        error_message = "Data not found in response"
+        print(error_message)
+        return {"error": error_message}
 
     match, total, retrieved = extract_match_type_total_retrieved(response, query, type_) #pylint: disable=W0612
     scraped_releases = extract_scraped_releases(response)
 
     if not scraped_releases:
-        print("No scraped releases found in response")
-        return []
+        error_message = "No scraped releases found in response"
+        print(error_message)
+        return {"error": error_message}
 
     return scraped_releases
 
@@ -325,6 +334,9 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
             ["videoquality", ','.join(qualities)],
         ]
         result = search(query=title, altquery=altquery, type_=title_type, quality_opts=default_opts, season_number=season)
+        if "error" in result:
+            print(f"An error occurred during the search: {result['error']}")
+            return
 
         filtered_results = [item for item in result if item.get("seeds") is not None and not multi_season_regex.search(item['title'])]
 
