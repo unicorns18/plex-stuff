@@ -2,6 +2,7 @@
 """
 TODO: Write a docstring
 """
+import cProfile
 from collections import namedtuple
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -20,6 +21,7 @@ import simdjson as sj
 import ujson
 from alldebrid import APIError, AllDebrid
 from filters import clean_title
+from uploader import check_file_extensions
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -314,6 +316,7 @@ def save_filtered_results(results: List[dict], filename: str, encoding: str = 'u
         ujson.dump(filtered_results, file, indent=4, sort_keys=True)
 
 def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
+    EXCLUDED_EXTENSIONS = ['.rar', '.iso', '.zip', '.7z', '.gz', '.bz2', '.xz']
     magnets = list(magnets)  # convert generator to list
     try:
         checkmagnets = alldebrid.check_magnet_instant(magnets=magnets)
@@ -329,10 +332,9 @@ def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Unio
     except Exception as exc:
         print(f"Unknown error occured: {exc}")
     return [False] * len(magnets)
-    # instant_values = [magnet_data.get('instant', False) if checkmagnets and checkmagnets['status'] == 'success' else False for magnet_data in checkmagnets['data']['magnets']] if checkmagnets else [False] * len(magnets)
-    # return instant_values
 
 multi_season_regex = re.compile(r'S\d{2}-S\d{2}', re.IGNORECASE)
+EXCLUDED_EXTENSIONS = ['.rar', '.iso', '.zip', '.7z', '.gz', '.bz2', '.xz']
 
 def search_best_qualities(title: str, title_type: str, qualities_sets: List[List[str]], filename_prefix: str):
     start_time = time.perf_counter()
@@ -357,6 +359,9 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
         cached_instants = get_cached_instants(ad, magnets)
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant else False
+            item['has_excluded_extension'] = item["cached"] and any(
+                check_file_extensions(link) for link in item["links"]
+            )
 
         for item in filtered_results:
             item_title = item['title']
@@ -417,10 +422,10 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds")
 
-# def main():
-#     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-#     FILENAME_PREFIX = "result"
-#     search_best_qualities(title="tt9054904", title_type="show", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+def main():
+    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+    FILENAME_PREFIX = "result"
+    search_best_qualities(title="tt0903747", title_type="show", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
-# if __name__ == "__main__":
-#     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
+if __name__ == "__main__":
+    cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
