@@ -334,7 +334,6 @@ def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Unio
     return [False] * len(magnets)
 
 multi_season_regex = re.compile(r'S\d{2}-S\d{2}', re.IGNORECASE)
-EXCLUDED_EXTENSIONS = ['.rar', '.iso', '.zip', '.7z', '.gz', '.bz2', '.xz']
 
 def search_best_qualities(title: str, title_type: str, qualities_sets: List[List[str]], filename_prefix: str):
     start_time = time.perf_counter()
@@ -379,7 +378,7 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
             post_processed_results = custom_sort(post_processed_results)
 
         season_suffix = f"_{season:02d}" if season else ""
-        post_processed_filename = f'postprocessing_results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
+        post_processed_filename = f'results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
         results_to_save = post_processed_results if post_processed_results else filtered_results
         save_filtered_results(results_to_save, post_processed_filename)
 
@@ -422,10 +421,10 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds")
 
-def main():
-    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-    FILENAME_PREFIX = "result"
-    search_best_qualities(title="tt0903747", title_type="show", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+# def main():
+#     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+#     FILENAME_PREFIX = "result"
+#     search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
-if __name__ == "__main__":
-    cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
+# if __name__ == "__main__":
+#     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")

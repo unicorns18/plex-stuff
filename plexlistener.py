@@ -3,6 +3,7 @@ import json
 import os
 import requests
 from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
 import time
 
 from orionoid import search_best_qualities
@@ -28,7 +29,59 @@ def print_with_filename():
     file_name = os.path.basename(file_path)
     return file_name
 
+def get_library_ids():
+    url = f"http://88.99.242.111:32400/library/sections?X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+    response = requests.get(url)
+    root = ET.fromstring(response.content)
+
+    library_ids = {}
+    for child in root:
+        library_ids[child.attrib['title']] = child.attrib['key']
+
+    return library_ids
+
+def refresh_library(library_name):
+    library_ids = get_library_ids()
+    library_id = library_ids.get(library_name)
+    if library_id:
+        url = f"http://88.99.242.111:32400/library/sections/{library_id}/refresh?X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+        response = requests.get(url)
+        if response.status_code == 200:
+            print(f"Successfully refreshed {library_name} library!")
+        else:
+            print(f"Failed to refresh {library_name} library.")
+    else:
+        print(f"No library found with name {library_name}.")
+
+def remove_from_watchlist(item_rating_key):
+    url = f"http://metadata.provider.plex.tv/actions/removeFromWatchlist"
+    params = {
+        'ratingKey': item_rating_key,
+        'X-Plex-Token': "GAyx53DTk4nMLyr9Mts_"
+    }
+    response = requests.put(url, params=params)
+    response.raise_for_status()
+    print(response.content)
+    print(response.status_code)
+
+def check_availability_and_remove_from_watchlist(item_title):
+    library_ids = get_library_ids()
+    for library_name, library_id in library_ids.items():
+        refresh_library(library_name)
+        url = f"http://88.99.242.111:32400/library/sections/{library_id}/all?X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+        response = requests.get(url)
+        root = ET.fromstring(response.content)
+        for video in root.iter('Video'):
+            if video.get('title') == item_title:
+                print(f"Item {item_title} found in {library_name} library.")
+                # Assuming we have a function remove_from_watchlist to remove the item
+                remove_from_watchlist(item_title)
+                return True
+    print(f"Item {item_title} not found in any library.")
+    return False
+
 def monitor_watchlist(url):
+    previous_watchlist = {}
     previous_watchlist = fetch_watchlist(url)
 
     while True:
@@ -67,8 +120,8 @@ def monitor_watchlist(url):
     search_best_qualities(title=TITLE, title_type=TYPE, qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
     items = []
-    for filename in os.listdir("postprocessing_results/"):
-        with open(os.path.join("postprocessing_results/", filename), "r") as f:
+    for filename in os.listdir("results/"):
+        with open(os.path.join("results/", filename), "r") as f:
             data = json.load(f)
             items.append(data[0])
 

@@ -24,8 +24,8 @@ def fetch_stream_data(session, imdb_id):
         logger.error(f"RequestException for imdb_id {imdb_id}: {e}")
         return None
 
-def get_movie_streams():
-    url = "https://mdblist.com/lists/suitability/to-watch-movies-all-time/json"
+def get_movie_streams(username, listname):
+    url = f"https://mdblist.com/lists/{username}/{listname}/json"
     try:
         response = requests.get(url)
         data = response.json()
