@@ -351,9 +351,15 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
         cached_instants = get_cached_instants(ad, magnets)
         for item, instant in zip(filtered_results, cached_instants):
             item["cached"] = instant if instant else False
-            item['has_excluded_extension'] = item["cached"] and any(
-                check_file_extensions(link) for link in item["links"]
-            )
+            item['has_excluded_extension'] = False
+            item['reason'] = None
+            if item["cached"]:
+                for link in item["links"]:
+                    has_excluded_extension, reason = check_file_extensions(link)
+                    if has_excluded_extension:
+                        item['has_excluded_extension'] = True
+                        item['reason'] = reason
+                        break
 
         for item in filtered_results:
             item_title = item['title']
@@ -414,10 +420,10 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds")
 
-# def main():
-#     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-#     FILENAME_PREFIX = "result"
-#     search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+def main():
+    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+    FILENAME_PREFIX = "result"
+    search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
-# if __name__ == "__main__":
-#     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
+if __name__ == "__main__":
+    cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")

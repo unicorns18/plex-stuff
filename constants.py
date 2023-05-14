@@ -1,4 +1,4 @@
-TRANSMISSION_CHECK          = False
+TRANSMISSION_CHECK          = True
 TRANSMISSION_HOST           = "localhost"
 TRANSMISSION_PORT           = 9091
 DEFAULT_API_KEY             = "tXQQw2JPx8iKEyeeOoJE"
