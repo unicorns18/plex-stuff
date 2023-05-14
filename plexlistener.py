@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
 import time
+from constants import X_PLEX_TOKEN
 
 from orionoid import search_best_qualities
 from uploader import process_magnet
@@ -13,14 +14,17 @@ def fetch_watchlist(url):
     response = requests.get(url)
     content = response.content
     soup = BeautifulSoup(content, "xml")
-    directories = soup.find_all("Video")
+    videos = soup.find_all("Video")
     watchlist = {}
-    for directory in directories:
-        watchlist[directory["ratingKey"]] = {
-            "title": directory["title"],
-            "year": directory["year"],
-            "type": directory["type"],
-        }
+    for video in videos:
+        try:
+            watchlist[video["ratingKey"]] = {
+                "title": video.get("title", "N/A"),
+                "year": video.get("year", "N/A"),
+                "type": video.get("type", "N/A"),
+            }
+        except KeyError as e:
+            print(f"Missing key: {e}")
     return watchlist
 
 def print_with_filename():
@@ -30,7 +34,7 @@ def print_with_filename():
     return file_name
 
 def get_library_ids():
-    url = f"http://88.99.242.111:32400/library/sections?X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+    url = f"http://88.99.242.111:32400/library/sections?X-Plex-Token={X_PLEX_TOKEN}"
     response = requests.get(url)
     root = ET.fromstring(response.content)
 
@@ -44,7 +48,7 @@ def refresh_library(library_name):
     library_ids = get_library_ids()
     library_id = library_ids.get(library_name)
     if library_id:
-        url = f"http://88.99.242.111:32400/library/sections/{library_id}/refresh?X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+        url = f"http://88.99.242.111:32400/library/sections/{library_id}/refresh?X-Plex-Token={X_PLEX_TOKEN}"
         response = requests.get(url)
         if response.status_code == 200:
             print(f"Successfully refreshed {library_name} library!")
@@ -57,7 +61,7 @@ def remove_from_watchlist(item_rating_key):
     url = f"http://metadata.provider.plex.tv/actions/removeFromWatchlist"
     params = {
         'ratingKey': item_rating_key,
-        'X-Plex-Token': "GAyx53DTk4nMLyr9Mts_"
+        'X-Plex-Token': f"{X_PLEX_TOKEN}"
     }
     response = requests.put(url, params=params)
     response.raise_for_status()
@@ -68,7 +72,7 @@ def check_availability_and_remove_from_watchlist(item_title):
     library_ids = get_library_ids()
     for library_name, library_id in library_ids.items():
         refresh_library(library_name)
-        url = f"http://88.99.242.111:32400/library/sections/{library_id}/all?X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+        url = f"http://88.99.242.111:32400/library/sections/{library_id}/all?X-Plex-Token={X_PLEX_TOKEN}"
         response = requests.get(url)
         root = ET.fromstring(response.content)
         for video in root.iter('Video'):
@@ -138,5 +142,5 @@ def monitor_watchlist(url):
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds. (Module {print_with_filename()})")
 
-url = "https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&X-Plex-Token=sxkzRsW9JtHSUy-Dne6s"
+url = f"https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&X-Plex-Token={X_PLEX_TOKEN}"
 monitor_watchlist(url)
