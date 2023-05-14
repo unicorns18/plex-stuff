@@ -13,7 +13,7 @@ def fetch_watchlist(url):
     response = requests.get(url)
     content = response.content
     soup = BeautifulSoup(content, "xml")
-    directories = soup.find_all("Directory")
+    directories = soup.find_all("Video")
     watchlist = {}
     for directory in directories:
         watchlist[directory["ratingKey"]] = {
@@ -87,6 +87,7 @@ def monitor_watchlist(url):
     while True:
         time.sleep(2)
         current_watchlist = fetch_watchlist(url)
+        print(f"Current watchlist: {current_watchlist}")
 
         previous_keys = set(previous_watchlist.keys())
         current_keys = set(current_watchlist.keys())
@@ -110,13 +111,13 @@ def monitor_watchlist(url):
 
     start_time = time.perf_counter()
     first_item_key = list(current_watchlist.keys())[0]
-    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-    FILENAME_PREFIX = "result"
     TITLE = current_watchlist[first_item_key]["title"]
     TYPE = current_watchlist[first_item_key]["type"]
     print(f"Title: {TITLE}")
     print(f"Type: {TYPE}")
     exit(0)
+    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+    FILENAME_PREFIX = "result"
     search_best_qualities(title=TITLE, title_type=TYPE, qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
     items = []
@@ -137,5 +138,5 @@ def monitor_watchlist(url):
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds. (Module {print_with_filename()})")
 
-url = "https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&&X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
+url = "https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&X-Plex-Token=sxkzRsW9JtHSUy-Dne6s"
 monitor_watchlist(url)
