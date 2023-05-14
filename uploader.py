@@ -10,10 +10,13 @@ import os
 import time
 from typing import Any, Dict, Iterable, List, Union
 from alldebrid import AllDebrid, APIError
-from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception, retry_if_result
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 import requests
 
 from constants import TRANSMISSION_CHECK, TRANSMISSION_HOST, TRANSMISSION_PORT
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
@@ -275,24 +278,25 @@ def check_file_extensions(uri: Union[str, List[str]]):
     except (APIError, ValueError) as exc:
         logging.info(f"Error checking magnet instant: {exc}")
         return False
-    
+
     if res['data']['magnets'][0]['instant']:
         files = res['data']['magnets'][0]['files']
-        logging.info("files: ", files)
         for n in files:
-            if any(n['n'].endswith(ext) for ext in EXCLUDED_EXTENSIONS):
-                logging.info(f"file extension found: {n['n']}")
-                logging.info("extensions found: ", any(n['n'].endswith(ext) for ext in EXCLUDED_EXTENSIONS))
-                return True
+            for ext in EXCLUDED_EXTENSIONS:
+                if n['n'].endswith(ext):
+                    print(f"file extension found: {n['n']}")
+                    print(f"extensions found: {ext}")
+                    return True
         return False
     else:
         if TRANSMISSION_CHECK:
             resp = fetch_torrent_metadata(uri)
             for file in resp['files']:
-                if any(file['name'].endswith(ext) for ext in EXCLUDED_EXTENSIONS):
-                    logging.info(f"file extension found: {file['name']}")
-                    logging.info("extensions found: ", any(file['name'].endswith(ext) for ext in EXCLUDED_EXTENSIONS))
-                    return True
+                for ext in EXCLUDED_EXTENSIONS:
+                    if file['name'].endswith(ext):
+                        print(f"file extension found: {file['name']}")
+                        print(f"extensions found: {ext}")
+                        return True
                 return False
 
 # Without rar files
@@ -311,9 +315,4 @@ for filename in os.listdir("results/"):
                 links = item["links"]
                 for link in links:
                     r = check_file_extensions(link)
-                    # print(r)
-                    if r == True:
-                        print(link)
-                        print("True")
-                        print()
-                        break
+                    print(r)
