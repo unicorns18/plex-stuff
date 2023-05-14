@@ -20,6 +20,7 @@ import requests
 import simdjson as sj
 import ujson
 from alldebrid import APIError, AllDebrid
+from constants import BASE_URL, BASE_URL_ORIONOID, DEFAULT_API_KEY, TMDB_API_KEY, TOKEN
 from filters import clean_title
 from uploader import check_file_extensions
 
@@ -29,13 +30,7 @@ redis_cache = redis.StrictRedis(host='localhost', port=6379, db=0)
 requests_cache.install_cache('orionoid_cache', backend='redis', connection=redis_cache, expire_after=604800)
 
 session = requests.Session()
-TOKEN = "ZZBAYPMQTXGGVHPKZJO5Y4SQJO3NA3XE7WBJLN67DOA3TLLQ3A7VMP532XSIDGKRPNQPCHNEV5HUGTD4UEU5IE6FBP4N7VV3ZZBKM6LZRUZ2WM7KKDKIYFJLV6C26JHA"
-API_HOST = "https://api.orionoid.com"
-DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
-TMDB_API_KEY = "cea9c08287d26a002386e865744fafc8"
-BASE_URL = "https://api.themoviedb.org/3"
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
-
 SEASON_EPISODE_REGEX = re.compile(r'(S[0-9]|complete|S\?[0-9])', re.I)
 
 def build_opts(default_opts) -> str:
@@ -43,8 +38,6 @@ def build_opts(default_opts) -> str:
 
 SEASON_REGEX = re.compile(r'S(\d+)', re.I)
 EPISODE_REGEX = re.compile(r'E(\d+)', re.I)
-
-BASE_URL_ORIONOID = 'https://api.orionoid.com'
 
 def build_url(token: str, query: str, type_: str, opts: str) -> str:
     if query is None:

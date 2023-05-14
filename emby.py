@@ -2,6 +2,8 @@ import json
 import requests
 import warnings
 
+from constants import EMBY_API_KEY
+
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 def get_library_ids(api_key):
@@ -43,5 +45,4 @@ def refresh_all_libraries(api_key):
     for library_id in library_ids:
         refresh_library(api_key, library_id)
 
-api_key = "84ef4a51a2ef47688167d87522c5ce36"
-refresh_all_libraries(api_key)
+refresh_all_libraries(EMBY_API_KEY)

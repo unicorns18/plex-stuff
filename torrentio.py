@@ -5,6 +5,7 @@ import time
 from alldebrid import AllDebrid
 import regex
 import requests
+from constants import DEFAULT_API_KEY
 from exceptions import IMDBIdNotFoundError, TorrentIOError
 from filters import clean_title
 from orionoid import get_cached_instants, save_filtered_results
@@ -147,7 +148,6 @@ def scrape(query: str, altquery: str):
 
     return scraped_releases
 
-DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
 
 start_time = time.perf_counter()
