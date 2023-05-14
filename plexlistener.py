@@ -144,3 +144,5 @@ def monitor_watchlist(url):
 
 url = f"https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&X-Plex-Token={X_PLEX_TOKEN}"
 monitor_watchlist(url)
+
+
