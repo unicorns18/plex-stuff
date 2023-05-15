@@ -3,6 +3,7 @@ import inspect
 import json
 import os
 import re
+from typing import Dict
 import unicodedata
 import requests
 from bs4 import BeautifulSoup
@@ -25,24 +26,30 @@ def remove_special_characters(text):
 
 def fetch_watchlist(url):
     headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store, must-revalidate"}
-    response = requests.get(url, headers=headers)
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # raise an exception if the HTTP status code is 4xx or 5xx
+    except requests.RequestException as e:
+        print(f"Error occurred while fetching watchlist: {e}")
+        return None
     content = response.content.decode('utf-8', 'ignore')
     soup = BeautifulSoup(content, "lxml")
-    print(soup)
     videos = soup.find_all("video")
     watchlist = {}
     for video in videos:
         try:
-            print(type(video["title"]))
-            title = remove_special_characters(video["title"])
+            title = video.get("title")  # using get() method to avoid KeyError
+            if title is not None and isinstance(title, str):
+                title = remove_special_characters(title)
+            else:
+                print(f"Warning: Unexpected title '{title}' in video: {video}")
             watchlist[video["ratingkey"]] = {
                 "title": title,
                 "year": video.get("year", "N/A"),
                 "type": video.get("type", "N/A"),
             }
-        except KeyError as e:
-            print(f"Missing key: {e}")
-
+        except Exception as e:
+            print(f"Error occurred while processing video: {e}")
     return watchlist
 
 def print_with_filename():
@@ -52,7 +59,8 @@ def print_with_filename():
     return file_name
 
 def get_library_ids():
-    url = f"http://88.99.242.111:32400/library/sections?X-Plex-Token={X_PLEX_TOKEN}"
+    # url = f"http://88.99.242.111:32400/library/sections?X-Plex-Token={X_PLEX_TOKEN}"
+    url = f"http://metadata.provider.plex.tv/library/sections?X-Plex-Token={X_PLEX_TOKEN}"
     response = requests.get(url)
     root = ET.fromstring(response.content)
 
@@ -66,7 +74,8 @@ def refresh_library(library_name):
     library_ids = get_library_ids()
     library_id = library_ids.get(library_name)
     if library_id:
-        url = f"http://88.99.242.111:32400/library/sections/{library_id}/refresh?X-Plex-Token={X_PLEX_TOKEN}"
+        # url = f"http://88.99.242.111:32400/library/sections/{library_id}/refresh?X-Plex-Token={X_PLEX_TOKEN}"
+        url = f"http://metadata.provider.plex.tv/library/sections/{library_id}/refresh?X-Plex-Token={X_PLEX_TOKEN}"
         response = requests.get(url)
         if response.status_code == 200:
             print(f"Successfully refreshed {library_name} library!")
@@ -86,17 +95,25 @@ def remove_from_watchlist(item_rating_key):
     print(response.content)
     print(response.status_code)
 
-def check_availability_and_remove_from_watchlist(item_title):
-    library_ids = get_library_ids()
+def check_availability_and_remove_from_watchlist(item_title: str) -> bool:
+    library_ids: Dict[str, str] = get_library_ids()
     for library_name, library_id in library_ids.items():
         refresh_library(library_name)
-        url = f"http://88.99.242.111:32400/library/sections/{library_id}/all?X-Plex-Token={X_PLEX_TOKEN}"
-        response = requests.get(url)
-        root = ET.fromstring(response.content)
+        url: str = f"http://metadata.provider.plex.tv/metadata/sections/{library_id}/all?X-Plex-Token={X_PLEX_TOKEN}"
+        try:
+            response: requests.Response = requests.get(url, timeout=10)
+            response.raise_for_status()  # raise an exception for 4xx and 5xx HTTP status codes
+        except requests.RequestException as e:
+            print(f"Error occurred while fetching library data: {e}")
+            continue  # skip to the next library
+        try:
+            root: ET.Element = ET.fromstring(response.content)
+        except ET.ParseError as e:
+            print(f"Error occurred while parsing XML: {e}")
+            continue  # skip to the next library
         for video in root.iter('Video'):
             if video.get('title') == item_title:
                 print(f"Item {item_title} found in {library_name} library.")
-                # Assuming we have a function remove_from_watchlist to remove the item
                 remove_from_watchlist(item_title)
                 return True
     print(f"Item {item_title} not found in any library.")
@@ -157,6 +174,14 @@ def monitor_watchlist(url):
         print(f"Downloading {title} from {link} in {quality} quality. (DEBUG: has_excluded_extension: {has_excluded_extension})")
 
         process_magnet(link)
+
+    while True:
+        if check_availability_and_remove_from_watchlist(title):
+            print(f"Item {title} has been removed from the watchlist.")
+            break
+        else:
+            print(f"Item {title} could not be found in any library, retrying in 2 seconds...")
+            time.sleep(2)
 
     end_time = time.perf_counter()
     rounded_end_time = round(end_time - start_time, 2)
