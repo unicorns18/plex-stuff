@@ -14,25 +14,28 @@ from orionoid import search_best_qualities
 from uploader import process_magnet
 
 def remove_special_characters(text):
-    # Replace weird character with a hyphen
-    text = text.replace("·", "-")
-    # Remove non-printable characters
-    text = re.sub(r'[^\x20-\x7E]', '', text)
-    # Remove invalid XML characters
-    text = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', text)
+    try:
+        text = text.replace("·", "-")
+        # text = re.sub(r'[^\x09\x0A\x0D\x20-\x7E\uA0-\uD7FF\uE000-\uFFFD]', '', text)
+        text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C" or ch == '-')
+    except Exception as exc:
+        print(f"Error occured while doing text processing on title: {text}, {exc}.")
+        return text
     return text
 
 def fetch_watchlist(url):
     headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store, must-revalidate"}
     response = requests.get(url, headers=headers)
-    content = response.content
-    soup = BeautifulSoup(content, "xml")
-    videos = soup.find_all("Video")
+    content = response.content.decode('utf-8', 'ignore')
+    soup = BeautifulSoup(content, "lxml")
+    print(soup)
+    videos = soup.find_all("video")
     watchlist = {}
     for video in videos:
         try:
+            print(type(video["title"]))
             title = remove_special_characters(video["title"])
-            watchlist[video["ratingKey"]] = {
+            watchlist[video["ratingkey"]] = {
                 "title": title,
                 "year": video.get("year", "N/A"),
                 "type": video.get("type", "N/A"),

@@ -150,18 +150,19 @@ def make_request(session: requests.Session, data: Dict[str, Any], retries: int =
                 time.sleep(0.2)
     raise Exception("Request failed after multiple retries")
 
-def fetch_torrent_metadata(magnet_uri: Union[str, List[str]]) -> Dict[str, Any]:
+def fetch_torrent_metadata(magnet_uri: Union[str, List[str]], timeout: int = 60) -> Dict[str, Any]:
     """
     Get metadata of a torrent from its magnet URI.
-    
+
     Args:
         magnet_uri: The magnet URI of the torrent
+        timeout: The number of seconds to wait for metadata to be obtained
 
     Returns:
         metadata: A dictionary containing the torrent's metadata
 
     Raises:
-        Exception: If torrent addition fails
+        Exception: If torrent addition fails or if metadata cannot be obtained within the timeout period
     """
     session = requests.Session()
 
@@ -176,51 +177,41 @@ def fetch_torrent_metadata(magnet_uri: Union[str, List[str]]) -> Dict[str, Any]:
         }
     }
 
-    response = make_request(session, data).json()
-    torrent_id = response.get('arguments', {}).get('torrent-added', {}).get('id')
-    if not torrent_id:
+    try:
+        response = make_request(session, data).json()
+        torrent_id = response['arguments']['torrent-added']['id']
+    except (KeyError, ValueError):
         raise Exception("Failed to add torrent")
 
-    start_time = time.time()
-    while True:
-        if time.time() - start_time >= 60:  # timeout after 60 seconds
-            break
+    try:
+        start_time = time.time()
+        while True:
+            if time.time() - start_time >= timeout:
+                raise Exception("Failed to get metadata within timeout period")
 
-        data = {
-            "method": "torrent-get",
-            "arguments": {
-                "ids": [torrent_id],
-                "fields": ["metadataPercentComplete"]
+            data = {
+                "method": "torrent-get",
+                "arguments": {
+                    "ids": [torrent_id],
+                    "fields": ["name", "hashString", "totalSize", "files"]
+                }
             }
-        }
 
-        response = make_request(session, data).json()
-        metadata_percent_complete = response.get('arguments', {}).get('torrents', [{}])[0].get('metadataPercentComplete')
-        if metadata_percent_complete == 1:
-            break
+            response = make_request(session, data).json()
+            torrent_info = response['arguments']['torrents'][0]
+            if torrent_info['metadataPercentComplete'] == 1:
+                break
 
-        time.sleep(0.2)
-
-    # Pause the torrent
-    data = {
-        "method": "torrent-stop",
-        "arguments": {
-            "ids": [torrent_id]
-        }
-    }
-    make_request(session, data)
-    time.sleep(0.2)  # Ensure the torrent is paused before removal
+    except (KeyError, ValueError):
+        raise Exception("Failed to get metadata")
 
     # Get the torrent info
-    data = {
-        "method": "torrent-get",
-        "arguments": {
-            "ids": [torrent_id],
-            "fields": ["name", "hashString", "totalSize", "files"]
-        }
+    metadata = {
+        'name': torrent_info.get('name'),
+        'total_size': torrent_info.get('totalSize'),
+        'hash': torrent_info.get('hashString'),
+        'files': [{'name': f['name'], 'size': f['length']} for f in torrent_info.get('files', [])]
     }
-    response = make_request(session, data).json()
-    torrent_info = response.get('arguments', {}).get('torrents', [{}])[0]
 
     # Remove the torrent
     data = {
@@ -231,12 +222,6 @@ def fetch_torrent_metadata(magnet_uri: Union[str, List[str]]) -> Dict[str, Any]:
         }
     }
     make_request(session, data)
-    metadata = {
-        'name': torrent_info.get('name'),
-        'total_size': torrent_info.get('totalSize'),
-        'hash': torrent_info.get('hashString'),
-        'files': [{'name': f['name'], 'size': f['length']} for f in torrent_info.get('files', [])]
-    }
 
     return metadata
 
