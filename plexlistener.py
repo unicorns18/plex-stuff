@@ -183,6 +183,7 @@ def monitor_watchlist(url):
             print(f"Item {title} could not be found in any library, retrying in 2 seconds...")
             time.sleep(2)
 
+    print("Finished downloading all items.")
     end_time = time.perf_counter()
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds. (Module {print_with_filename()})")
