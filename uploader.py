@@ -13,12 +13,11 @@ from alldebrid import AllDebrid, APIError
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 import requests
 
-from constants import TRANSMISSION_CHECK, TRANSMISSION_HOST, TRANSMISSION_PORT
+from constants import DEFAULT_API_KEY, EXCLUDED_EXTENSIONS, TRANSMISSION_CHECK, TRANSMISSION_HOST, TRANSMISSION_PORT
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-DEFAULT_API_KEY = "tXQQw2JPx8iKEyeeOoJE"
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
 
 def process_magnet(magnet: str) -> None:
@@ -151,195 +150,95 @@ def make_request(session: requests.Session, data: Dict[str, Any], retries: int =
                 time.sleep(0.2)
     raise Exception("Request failed after multiple retries")
 
-# def fetch_torrent_metadata(magnet_uri: str) -> Dict[str, Any]:
-#     """
-#     Get metadata of a torrent from its magnet URI.
-    
-#     Args:
-#         magnet_uri: The magnet URI of the torrent
-
-#     Returns:
-#         metadata: A dictionary containing the torrent's metadata
-
-#     Raises:
-#         Exception: If torrent addition fails
-#     """
-#     session = requests.Session()
-
-#     # Add the torrent (unpaused)
-#     data = {
-#         "method": "torrent-add",
-#         "arguments": {
-#             "filename": magnet_uri,
-#             "paused": False,
-#             "peer-limit": 200,
-#             "bandwidthPriority": 1
-#         }
-#     }
-
-#     response = make_request(session, data).json()
-#     torrent_id = response.get('arguments', {}).get('torrent-added', {}).get('id')
-#     if not torrent_id:
-#         raise Exception("Failed to add torrent")
-
-#     start_time = time.time()
-#     while True:
-#         if time.time() - start_time >= 60:  # timeout after 60 seconds
-#             break
-
-#         data = {
-#             "method": "torrent-get",
-#             "arguments": {
-#                 "ids": [torrent_id],
-#                 "fields": ["metadataPercentComplete"]
-#             }
-#         }
-
-#         response = make_request(session, data).json()
-#         metadata_percent_complete = response.get('arguments', {}).get('torrents', [{}])[0].get('metadataPercentComplete')
-#         if metadata_percent_complete == 1:
-#             break
-
-#         time.sleep(0.2)
-
-#     # Pause the torrent
-#     data = {
-#         "method": "torrent-stop",
-#         "arguments": {
-#             "ids": [torrent_id]
-#         }
-#     }
-#     make_request(session, data)
-#     time.sleep(0.2)  # Ensure the torrent is paused before removal
-
-#     # Get the torrent info
-#     data = {
-#         "method": "torrent-get",
-#         "arguments": {
-#             "ids": [torrent_id],
-#             "fields": ["name", "hashString", "totalSize", "files"]
-#         }
-#     }
-#     response = make_request(session, data).json()
-#     torrent_info = response.get('arguments', {}).get('torrents', [{}])[0]
-
-#     # Remove the torrent
-#     data = {
-#         "method": "torrent-remove",
-#         "arguments": {
-#             "ids": [torrent_id],
-#             "delete-local-data": True
-#         }
-#     }
-#     make_request(session, data)
-#     metadata = {
-#         'name': torrent_info.get('name'),
-#         'total_size': torrent_info.get('totalSize'),
-#         'hash': torrent_info.get('hashString'),
-#         'files': [{'name': f['name'], 'size': f['length']} for f in torrent_info.get('files', [])]
-#     }
-
-#     return metadata
-
-def fetch_torrent_metadata(magnet_uris: List[str]) -> List[Dict[str, Any]]:
+def fetch_torrent_metadata(magnet_uri: Union[str, List[str]]) -> Dict[str, Any]:
     """
-    Get metadata of multiple torrents from their magnet URIs.
+    Get metadata of a torrent from its magnet URI.
     
     Args:
-        magnet_uris: A list of the magnet URIs of the torrents
+        magnet_uri: The magnet URI of the torrent
 
     Returns:
-        metadatas: A list of dictionaries containing the torrents' metadata
+        metadata: A dictionary containing the torrent's metadata
 
     Raises:
         Exception: If torrent addition fails
     """
     session = requests.Session()
-    metadatas = []
-    torrent_ids = []
 
-    # Add the torrents (unpaused)
-    for magnet_uri in magnet_uris:
-        data = {
-            "method": "torrent-add",
-            "arguments": {
-                "filename": magnet_uri,
-                "paused": False,
-                "peer-limit": 200,
-                "bandwidthPriority": 1
-            }
+    # Add the torrent (unpaused)
+    data = {
+        "method": "torrent-add",
+        "arguments": {
+            "filename": magnet_uri,
+            "paused": False,
+            "peer-limit": 10000,
+            "bandwidthPriority": 1
         }
+    }
 
-        response = make_request(session, data).json()
-        torrent_id = response.get('arguments', {}).get('torrent-added', {}).get('id')
-        if not torrent_id:
-            raise Exception("Failed to add torrent")
-        torrent_ids.append(torrent_id)
+    response = make_request(session, data).json()
+    torrent_id = response.get('arguments', {}).get('torrent-added', {}).get('id')
+    if not torrent_id:
+        raise Exception("Failed to add torrent")
 
     start_time = time.time()
     while True:
         if time.time() - start_time >= 60:  # timeout after 60 seconds
             break
 
-        for torrent_id in torrent_ids:
-            data = {
-                "method": "torrent-get",
-                "arguments": {
-                    "ids": [torrent_id],
-                    "fields": ["metadataPercentComplete"]
-                }
-            }
-
-            response = make_request(session, data).json()
-            metadata_percent_complete = response.get('arguments', {}).get('torrents', [{}])[0].get('metadataPercentComplete')
-            if metadata_percent_complete == 1:
-                break
-
-            time.sleep(0.2)
-
-    # Pause the torrents
-    for torrent_id in torrent_ids:
-        data = {
-            "method": "torrent-stop",
-            "arguments": {
-                "ids": [torrent_id]
-            }
-        }
-        make_request(session, data)
-        time.sleep(0.2)  # Ensure the torrent is paused before removal
-
-    # Get the torrent info
-    for torrent_id in torrent_ids:
         data = {
             "method": "torrent-get",
             "arguments": {
                 "ids": [torrent_id],
-                "fields": ["name", "hashString", "totalSize", "files"]
+                "fields": ["metadataPercentComplete"]
             }
         }
+
         response = make_request(session, data).json()
-        torrent_info = response.get('arguments', {}).get('torrents', [{}])[0]
+        metadata_percent_complete = response.get('arguments', {}).get('torrents', [{}])[0].get('metadataPercentComplete')
+        if metadata_percent_complete == 1:
+            break
 
-        # Remove the torrent
-        data = {
-            "method": "torrent-remove",
-            "arguments": {
-                "ids": [torrent_id],
-                "delete-local-data": True
-            }
+        time.sleep(0.2)
+
+    # Pause the torrent
+    data = {
+        "method": "torrent-stop",
+        "arguments": {
+            "ids": [torrent_id]
         }
-        make_request(session, data)
-        metadata = {
-            'name': torrent_info.get('name'),
-            'total_size': torrent_info.get('totalSize'),
-            'hash': torrent_info.get('hashString'),
-            'files': [{'name': f['name'], 'size': f['length']} for f in torrent_info.get('files', [])]
+    }
+    make_request(session, data)
+    time.sleep(0.2)  # Ensure the torrent is paused before removal
+
+    # Get the torrent info
+    data = {
+        "method": "torrent-get",
+        "arguments": {
+            "ids": [torrent_id],
+            "fields": ["name", "hashString", "totalSize", "files"]
         }
-        metadatas.append(metadata)
+    }
+    response = make_request(session, data).json()
+    torrent_info = response.get('arguments', {}).get('torrents', [{}])[0]
 
-    return metadatas
+    # Remove the torrent
+    data = {
+        "method": "torrent-remove",
+        "arguments": {
+            "ids": [torrent_id],
+            "delete-local-data": True
+        }
+    }
+    make_request(session, data)
+    metadata = {
+        'name': torrent_info.get('name'),
+        'total_size': torrent_info.get('totalSize'),
+        'hash': torrent_info.get('hashString'),
+        'files': [{'name': f['name'], 'size': f['length']} for f in torrent_info.get('files', [])]
+    }
 
-EXCLUDED_EXTENSIONS = ['.rar', '.iso', '.zip', '.7z', '.gz', '.bz2', '.xz']
+    return metadata
 
 def is_none(result):
     return result is None
@@ -348,53 +247,94 @@ def is_error(exception):
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry_error_callback=is_error, retry=retry_if_result(is_none))
 def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, None]]:
-    reason = "No file extensions checked yet."
-
-    if not uri.startswith('magnet:'):
+    
+    # If the given URI is a string and doesn't start with 'magnet:', download and upload the file to AllDebrid
+    if isinstance(uri, str) and not uri.startswith('magnet:'):
         try:
             magnet_uri = ad._download_and_upload_single_file(uri)
         except (ValueError, APIError) as exc:
-            reason = f"Error downloading and uploading file to AllDebrid: {exc} (check_file_extensions)"
-            return False, reason
+            return False, f"Error downloading and uploading file to AllDebrid: {exc} (check_file_extensions)"
     else:
         magnet_uri = uri
 
+    # Check if the magnet link is instant using AllDebrid's API
     try:
-        res =  ad.check_magnet_instant(magnets=uri)
+        res = ad.check_magnet_instant(magnets=uri)
     except (APIError, ValueError) as exc:
-        reason = f"Error checking magnet instant: {exc}"
-        return False, reason
+        return False, f"Error checking magnet instant: {exc}"
 
+    # If the magnet link is instant, check the files in the magnet link for excluded extensions
     if res['data']['magnets'][0]['instant']:
         files = res['data']['magnets'][0]['files']
-        for n in files:
-            for ext in EXCLUDED_EXTENSIONS:
-                if n['n'].endswith(ext):
-                    reason = f"File extension found: {n['n']}. Extensions found: {ext}."
-                    return True, reason
-        reason = "No excluded extensions found in magnet files. (AllDebrid)"
-        return False, reason
-    else:
-        if TRANSMISSION_CHECK:
-            resp = fetch_torrent_metadata(uri)
-            for file in resp['files']:
-                for ext in EXCLUDED_EXTENSIONS:
-                    if file['name'].endswith(ext):
-                        print(f"File extension found: {file['name']}. Extensions found: {ext}.")
-                        reason = f"File extension found: {file['name']}. Extensions found: {ext}."
-                        return True, reason
-            reason = "No excluded extensions found in torrent metadata. (Transmission)"
-            return False, reason
+        excluded_files = [n['n'] for n in files for ext in EXCLUDED_EXTENSIONS if n['n'].endswith(ext)]
+        if excluded_files:
+            return True, f"File extension found: {excluded_files}. Extensions found: {EXCLUDED_EXTENSIONS}."
         else:
-            reason = "Transmission check is not enabled."
-            return False, reason
+            return False, "No excluded extensions found in magnet files. (AllDebrid)"
+    
+    # If the magnet link is not instant and TRANSMISSION_CHECK is enabled, check the torrent metadata for excluded extensions
+    elif TRANSMISSION_CHECK:
+        resp = fetch_torrent_metadata(uri)
+        excluded_files = [file['name'] for file in resp['files'] for ext in EXCLUDED_EXTENSIONS if file['name'].endswith(ext)]
+        if excluded_files:
+            return True, f"File extension found: {excluded_files}. Extensions found: {EXCLUDED_EXTENSIONS}."
+        else:
+            return False, "No excluded extensions found in torrent metadata. (Transmission)"
+    
+    # If the magnet link is not instant and TRANSMISSION_CHECK is not enabled, return a message indicating that the check is not enabled
+    else:
+        return False, "Transmission check is not enabled."
 
-for filename in os.listdir("results/"):
-    if filename.endswith(".json"):
-        with open("results/" + filename, "r") as f:
-            data = json.load(f)
-            for item in data:
-                links = item["links"]
-                for link in links:
-                    r = check_file_extensions(link)
-                    print(r)
+
+
+# def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, None]]:
+#     reason = "No file extensions checked yet."
+
+#     if isinstance(uri, str) and not uri.startswith('magnet:'):
+#         try:
+#             magnet_uri = ad._download_and_upload_single_file(uri)
+#         except (ValueError, APIError) as exc:
+#             reason = f"Error downloading and uploading file to AllDebrid: {exc} (check_file_extensions)"
+#             return False, reason
+#     else:
+#         magnet_uri = uri
+
+#     try:
+#         res =  ad.check_magnet_instant(magnets=uri)
+#     except (APIError, ValueError) as exc:
+#         reason = f"Error checking magnet instant: {exc}"
+#         return False, reason
+
+#     if res['data']['magnets'][0]['instant']:
+#         files = res['data']['magnets'][0]['files']
+#         for n in files:
+#             for ext in EXCLUDED_EXTENSIONS:
+#                 if n['n'].endswith(ext):
+#                     reason = f"File extension found: {n['n']}. Extensions found: {ext}."
+#                     return True, reason
+#         reason = "No excluded extensions found in magnet files. (AllDebrid)"
+#         return False, reason
+#     else:
+#         if TRANSMISSION_CHECK:
+#             resp = fetch_torrent_metadata(uri)
+#             for file in resp['files']:
+#                 for ext in EXCLUDED_EXTENSIONS:
+#                     if file['name'].endswith(ext):
+#                         print(f"File extension found: {file['name']}. Extensions found: {ext}.")
+#                         reason = f"File extension found: {file['name']}. Extensions found: {ext}."
+#                         return True, reason
+#             reason = "No excluded extensions found in torrent metadata. (Transmission)"
+#             return False, reason
+#         else:
+#             reason = "Transmission check is not enabled."
+#             return False, reason
+
+# magnets = []
+# for filename in os.listdir("results/"):
+#     if filename.endswith(".json"):
+#         with open("results/" + filename, "r") as f:
+#             data = json.load(f)
+#             for item in data:
+#                 links = item["links"]
+#                 for link in links:
+#                     print(check_file_extensions(link))

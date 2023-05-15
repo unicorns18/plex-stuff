@@ -26,12 +26,19 @@ from uploader import check_file_extensions
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-redis_cache = redis.StrictRedis(host='localhost', port=6379, db=0)
-requests_cache.install_cache('orionoid_cache', backend='redis', connection=redis_cache, expire_after=604800)
+# TODO: figure out why this cache affects other modules which import this module
+# redis_cache = redis.StrictRedis(host='localhost', port=6379, db=0)
+# requests_cache.install_cache('orionoid_cache', backend='redis', connection=redis_cache, expire_after=604800)
 
 session = requests.Session()
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
 SEASON_EPISODE_REGEX = re.compile(r'(S[0-9]|complete|S\?[0-9])', re.I)
+
+def setup_redis_cache():
+    redis_cache = redis.StrictRedis(host='localhost', port=6379, db=0)
+    requests_cache.install_cache('orionoid_cache', backend='redis', connection=redis_cache, expire_after=604800)
+
+setup_redis_cache()
 
 def build_opts(default_opts) -> str:
     return '&'.join(['='.join(opt) for opt in default_opts])
@@ -420,10 +427,10 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds")
 
-def main():
-    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-    FILENAME_PREFIX = "result"
-    search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+# def main():
+#     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+#     FILENAME_PREFIX = "result"
+#     search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
 
-if __name__ == "__main__":
-    cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
+# if __name__ == "__main__":
+#     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")

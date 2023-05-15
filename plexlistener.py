@@ -1,6 +1,9 @@
+import html
 import inspect
 import json
 import os
+import re
+import unicodedata
 import requests
 from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
@@ -10,21 +13,33 @@ from constants import X_PLEX_TOKEN
 from orionoid import search_best_qualities
 from uploader import process_magnet
 
+def remove_special_characters(text):
+    # Replace weird character with a hyphen
+    text = text.replace("·", "-")
+    # Remove non-printable characters
+    text = re.sub(r'[^\x20-\x7E]', '', text)
+    # Remove invalid XML characters
+    text = re.sub(r'[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', '', text)
+    return text
+
 def fetch_watchlist(url):
-    response = requests.get(url)
+    headers = {"User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store, must-revalidate"}
+    response = requests.get(url, headers=headers)
     content = response.content
     soup = BeautifulSoup(content, "xml")
     videos = soup.find_all("Video")
     watchlist = {}
     for video in videos:
         try:
+            title = remove_special_characters(video["title"])
             watchlist[video["ratingKey"]] = {
-                "title": video.get("title", "N/A"),
+                "title": title,
                 "year": video.get("year", "N/A"),
                 "type": video.get("type", "N/A"),
             }
         except KeyError as e:
             print(f"Missing key: {e}")
+
     return watchlist
 
 def print_with_filename():
@@ -128,13 +143,15 @@ def monitor_watchlist(url):
     for filename in os.listdir("results/"):
         with open(os.path.join("results/", filename), "r") as f:
             data = json.load(f)
-            items.append(data[0])
+            if not data[0].get('has_excluded_extension', False):  # Exclude if has_excluded_extension is true
+                items.append(data[0])
 
     for item in items:
         title = item["title"]
         link = item["links"][0]
         quality = item["quality"]
-        print(f"Downloading {title} from {link} in {quality} quality.")
+        has_excluded_extension = item["has_excluded_extension"]
+        print(f"Downloading {title} from {link} in {quality} quality. (DEBUG: has_excluded_extension: {has_excluded_extension})")
 
         process_magnet(link)
 
@@ -142,7 +159,7 @@ def monitor_watchlist(url):
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds. (Module {print_with_filename()})")
 
-url = f"https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&X-Plex-Token={X_PLEX_TOKEN}"
+url = f"https://metadata.provider.plex.tv/library/sections/watchlist/all?&includeFields=title%2Ctype%2Cyear%2CratingKey&includeElements=Guid&sort=watchlistedAt%3Adesc&X-Plex-Token=GAyx53DTk4nMLyr9Mts_"
 monitor_watchlist(url)
 
 
