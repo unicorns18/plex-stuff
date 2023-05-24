@@ -7,6 +7,7 @@ from collections import namedtuple
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
+import json
 import os
 import re
 import time
@@ -328,11 +329,55 @@ def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Unio
 
 multi_season_regex = re.compile(r'S\d{2}-S\d{2}', re.IGNORECASE)
 
-def search_best_qualities(title: str, title_type: str, qualities_sets: List[List[str]], filename_prefix: str):
+def get_title_type(title: str, year: Optional[int] = None):
+    # Your API key
+    api_key = "uwk2jbhy7acivnyzpq44hh70y"
+
+    # IMDB ID pattern
+    imdb_id_pattern = r"^tt\d+$"
+
+    # Define the endpoint URLs
+    if re.match(imdb_id_pattern, title):
+        url_template = f"https://mdblist.com/api/?apikey={api_key}&i={title}"
+    else:
+        url_template = f"https://mdblist.com/api/?apikey={api_key}&s={title}&y={year}"
+
+    print(url_template)
+
+    # Make the request to the API
+    try:
+        response = requests.get(url_template)
+        response.raise_for_status()  # Will raise an HTTPError if the status is 4xx, 5xx
+    except requests.exceptions.RequestException as err:
+        print(f"Error: Request to MDBlist API failed due to {err}")
+        return None
+
+    try:
+        data = response.json()
+        if re.match(imdb_id_pattern, title):
+            title_type = data["type"]
+        else:
+            title_type = data["search"][0]["type"]
+    except (KeyError, IndexError) as err:
+        print(f"Error: Expected data not found in the MDBlist API response. Details: {err}")
+        return None
+
+    return title_type
+
+def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_prefix: str, title_type: Optional[str] = None):
     start_time = time.perf_counter()
 
+    year_match = re.search(r'\b\d{4}\b', title)
+    year = int(year_match.group(0)) if year_match else None
+    title = title.replace(str(year), '') if year else title
+    title = title.replace('()', '').strip()
+    title_type = get_title_type(title.strip(), year)
+
+    if title_type not in ("movie", "show"):
+        raise ValueError("title_type must be either 'movie' or 'show'")
+
     def process_quality(qualities: List[str], season: Optional[int] = None):
-        altquery = title if title_type == "movie" else f"{title} S{season:02d}"
+        altquery = title_type if title_type == "movie" else f"{title} S{season:02d}"
         default_opts = [
             ["sortvalue", "best"],
             ["streamtype", "torrent"],
@@ -340,6 +385,7 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
             ["filename", "true"],
             ["videoquality", ','.join(qualities)],
         ]
+        print(title, altquery)
         result = search(query=title, altquery=altquery, type_=title_type, quality_opts=default_opts, season_number=season)
         if "error" in result:
             print(f"An error occurred during the search: {result['error']}")
@@ -420,10 +466,60 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds")
 
-# def main():
-#     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-#     FILENAME_PREFIX = "result"
-#     search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from functools import wraps
 
-# if __name__ == "__main__":
-#     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
+app = Flask(__name__)
+CORS(app)
+
+QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+FILENAME_PREFIX = "result"
+
+api_key = "suitloveshisapikeyswtfmomentweirdchamp"
+
+def require_api_key(view_func):
+    @wraps(view_func)
+    def decorated(*args, **kwargs):
+        if 'apikey' in request.headers and request.headers['apikey'] == api_key:
+            return view_func(*args, **kwargs)
+        else:
+            return jsonify({'error': 'unauthorized'}), 401
+    return decorated
+
+from uploader import process_magnet
+
+@app.route('/process_magnet_uri', methods=['POST'])
+@require_api_key
+def process_magnet_uri():
+    magnet = request.args.get("magnet")
+    try:
+        resp = process_magnet(magnet)    
+    except (APIError, ValueError) as exc:
+        return jsonify({'error': 'Magnet could not be processed, DM unicorns. (%s)' % exc}), 400
+    return jsonify({'success': 'Magnet processed successfully'}), 200
+
+@app.route("/search_id", methods=["POST"])
+@require_api_key
+def search_id():
+    imdb_id = request.args.get("imdb_id")
+
+    search_best_qualities(imdb_id, QUALITIES_SETS, FILENAME_PREFIX)
+
+    results_dir = os.path.join(os.getcwd(), 'results')
+    result_files = []
+    start_time = time.time()
+    while not result_files and time.time() - start_time < 60:  # wait up to 60 seconds
+        result_files = [f for f in os.listdir(results_dir) if f.startswith(imdb_id)]
+        time.sleep(1)  # wait a second before checking again
+
+    results = []
+    for result in result_files:
+        with open(os.path.join(results_dir, result), 'r') as f:
+            results.extend(json.load(f))
+        os.remove(os.path.join(results_dir, result))
+
+    return json.dumps(results)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', debug=True, port=1337)
