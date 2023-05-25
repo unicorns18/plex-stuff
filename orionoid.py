@@ -7,6 +7,7 @@ from collections import namedtuple
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
+import json
 import os
 import re
 import time
@@ -33,9 +34,6 @@ session = requests.Session()
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
 SEASON_EPISODE_REGEX = re.compile(r'(S[0-9]|complete|S\?[0-9])', re.I)
 
-def build_opts(default_opts) -> str:
-    return '&'.join(['='.join(opt) for opt in default_opts])
-
 SEASON_REGEX = re.compile(r'S(\d+)', re.I)
 EPISODE_REGEX = re.compile(r'E(\d+)', re.I)
 
@@ -52,12 +50,6 @@ def build_url(token: str, query: str, type_: str, opts: str) -> str:
 
     query_params = urlencode(params)
     return f'{BASE_URL_ORIONOID}?{query_params}&{opts}'
-
-def response_is_successful(response: dict) -> bool:
-    return response.get('result', {}).get('status') == 'success'
-
-def response_has_data(response: dict) -> bool:
-    return "data" in response and "streams" in response["data"]
 
 def extract_match_type_total_retrieved(response: dict, query: str, type_: str) -> Tuple[Optional[str], int, int]:
     NONE = "None"
@@ -114,13 +106,37 @@ def extract_scraped_releases(response: dict) -> List[Dict]:
             source = res.get("stream", {}).get("source", "")
             quality = res.get("video", {}).get("quality", "")
 
+            # additional information useful for filtering and scoring
+            meta = res.get("meta", {})
+            release = meta.get("release", {})
+            uploader = meta.get("uploader", {})
+
+            video = res.get("video", {})
+            quality = video.get("quality", "")
+            codec = video.get("codec", "")
+
+            audio = res.get("audio", {})
+            audio_type = audio.get("type", "")
+            channels = audio.get("channels", 0)
+            audio_system = audio.get("system", "")
+            audio_codec = audio.get("codec", "")
+            audio_langs = audio.get("languages", [])
+
             scraped_releases.append({
                 "title": title,
                 "size": size,
                 "links": links,
                 "seeds": seeds,
                 "source": source,
-                "quality": quality
+                "quality": quality,
+                "release": release,
+                "uploader": uploader,
+                "codec": codec,
+                "audio_type": audio_type,
+                "channels": channels,
+                "audio_system": audio_system,
+                "audio_codec": audio_codec,
+                "audio_languages": audio_langs
             })
 
     except Exception as e:
@@ -128,17 +144,15 @@ def extract_scraped_releases(response: dict) -> List[Dict]:
 
     return scraped_releases
 
-def normalize_queries(query: str, altquery: str) -> Tuple[str, str]:
-    if altquery == "(.*)":
-        altquery = query
-    return query, altquery
-
 SEASON_REGEX = re.compile(r'S(\d+)', re.I)
 EPISODE_REGEX = re.compile(r'E(\d+)', re.I)
     
 def search(query: str, altquery: str, type_: str, quality_opts, season_number: Optional[int] = None, max_retries: int = 3) -> Optional[Dict]:
-    query, altquery = normalize_queries(query, altquery)
-    opts = build_opts(quality_opts) 
+    if altquery == "(.*)":
+        altquery = query
+    else:
+        query = f"{query} {altquery}"
+    opts = '&'.join(['='.join(opt) for opt in quality_opts])
     if type_ == "show" or type_ == "tv": 
         if season_number is not None:
             opts = f"{opts}&numberseason={season_number}"
@@ -163,12 +177,12 @@ def search(query: str, altquery: str, type_: str, quality_opts, season_number: O
         print(error_message)
         return {"error": error_message}
 
-    if not response_is_successful(response):
+    if response.get('result', {}).get('status') != 'success':
         error_message = "Error: Did not receive a successful response from the server."
         print(error_message)
         return {"error": error_message}
 
-    if not response_has_data(response):
+    if "data" not in response or "streams" not in response["data"]:
         error_message = "Data not found in response"
         print(error_message)
         return {"error": error_message}
@@ -293,21 +307,6 @@ def get_season_data_title(title: str, retries: int, backoff_factor: float) -> Op
             print(f"Error: {exc}")
             return None
 
-import ujson
-
-def save_filtered_results(results: List[dict], filename: str, encoding: str = 'utf-8') -> None:
-    if not filename:
-        raise ValueError("Filename must not be empty")
-
-    directory = os.path.dirname(filename)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory)
-
-    filtered_results = [item for item in results if item.get("seeds") is not None]
-
-    with open(filename, 'w', encoding=encoding, buffering=8192) as file:
-        ujson.dump(filtered_results, file, indent=4, sort_keys=True)
-
 def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Union[str, bool]]:
     EXCLUDED_EXTENSIONS = ['.rar', '.iso', '.zip', '.7z', '.gz', '.bz2', '.xz']
     magnets = list(magnets)  # convert generator to list
@@ -328,11 +327,61 @@ def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Unio
 
 multi_season_regex = re.compile(r'S\d{2}-S\d{2}', re.IGNORECASE)
 
-def search_best_qualities(title: str, title_type: str, qualities_sets: List[List[str]], filename_prefix: str):
+def get_title_type(title: str, year: Optional[int] = None):
+    # Your API key
+    api_key = "uwk2jbhy7acivnyzpq44hh70y"
+
+    # IMDB ID pattern
+    imdb_id_pattern = r"^tt\d+$"
+
+    # Define the endpoint URLs
+    if re.match(imdb_id_pattern, title):
+        url_template = f"https://mdblist.com/api/?apikey={api_key}&i={title}"
+    else:
+        url_template = f"https://mdblist.com/api/?apikey={api_key}&s={title}&y={year}"
+
+    print(url_template)
+
+    cached_response = redis_cache.get(url_template)
+    if cached_response:
+        data = json.loads(cached_response)
+    else:
+        try:
+            response = requests.get(url_template)
+            response.raise_for_status()  # Will raise an HTTPError if the status is 4xx, 5xx
+        except requests.exceptions.RequestException as err:
+            print(f"Error: Request to MDBlist API failed due to {err}")
+            return None
+        
+        data = response.json()
+
+        redis_cache.set(url_template, json.dumps(data), ex=86400)
+
+    try:
+        if re.match(imdb_id_pattern, title):
+            title_type = data["type"]
+        else:
+            title_type = data["search"][0]["type"]
+    except (KeyError, IndexError) as err:
+        print(f"Error: Expected data not found in the MDBlist API response. Details: {err}")
+        return None
+
+    return title_type
+
+def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_prefix: str, title_type: Optional[str] = None):
     start_time = time.perf_counter()
 
+    year_match = re.search(r'\b\d{4}\b', title)
+    year = int(year_match.group(0)) if year_match else None
+    title = title.replace(str(year), '') if year else title
+    title = title.replace('()', '').strip()
+    title_type = get_title_type(title.strip(), year)
+
+    if title_type not in ("movie", "show"):
+        raise ValueError("title_type must be either 'movie' or 'show'")
+
     def process_quality(qualities: List[str], season: Optional[int] = None):
-        altquery = title if title_type == "movie" else f"{title} S{season:02d}"
+        altquery = title_type if title_type == "movie" else f"{title} S{season:02d}"
         default_opts = [
             ["sortvalue", "best"],
             ["streamtype", "torrent"],
@@ -340,6 +389,7 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
             ["filename", "true"],
             ["videoquality", ','.join(qualities)],
         ]
+        # print(title, altquery)
         result = search(query=title, altquery=altquery, type_=title_type, quality_opts=default_opts, season_number=season)
         if "error" in result:
             print(f"An error occurred during the search: {result['error']}")
@@ -379,10 +429,10 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
         season_suffix = f"_{season:02d}" if season else ""
         post_processed_filename = f'results/{title}_{filename_prefix}_{"_".join(qualities)}_orionoid{season_suffix}_post_processed.json'
         results_to_save = post_processed_results if post_processed_results else filtered_results
-        save_filtered_results(results_to_save, post_processed_filename)
 
-        return post_processed_results
+        return results_to_save
     
+    results = []
     exceptions = []
     num_workers = os.cpu_count()
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
@@ -409,6 +459,10 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
                 qualities, season = futures[future]
             try:
                 data = future.result()
+                if isinstance(data, list):
+                    results.extend(data)
+                else:
+                    results.append(data)
             except Exception as exc:
                 print(f'{qualities} {season if season else ""} generated an exception: {exc}')
                 exceptions.append(exc)
@@ -419,11 +473,43 @@ def search_best_qualities(title: str, title_type: str, qualities_sets: List[List
     end_time = time.perf_counter()
     rounded_end_time = round(end_time - start_time, 2)
     print(f"Finished in {rounded_end_time} seconds")
+    return results
 
-# def main():
-#     QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-#     FILENAME_PREFIX = "result"
-#     search_best_qualities(title="tt0910970", title_type="movie", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+def main():
+    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+    FILENAME_PREFIX = "result"
+    res = search_best_qualities(title="tt1160419", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+    with open("results.json", "w") as f:
+        json.dump(res, f, indent=4)
 
-# if __name__ == "__main__":
-#     cProfile.run("main()", filename="profiling_results.prof", sort="cumtime")
+if __name__ == "__main__":
+    cProfile.run('main()', 'output.prof', sort='cumtime')
+
+# from flask import Flask, request, jsonify
+# from flask_cors import CORS
+
+# app = Flask(__name__)
+# CORS(app)
+
+# QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+# FILENAME_PREFIX = "result"
+
+# @app.route("/search", methods=["POST"])
+# def search():
+#     data = request.get_json()
+#     imdb_id = data["imdb_id"]
+
+#     results_dir = os.path.join(os.getcwd(), 'results')
+#     result_files = []
+#     start_time = time.time()
+#     while not result_files and time.time() - start_time < 60:  # wait up to 60 seconds
+#         result_files = [f for f in os.listdir(results_dir) if f.startswith(imdb_id)]
+#         time.sleep(1)  # wait a second before checking again
+
+#     results = []
+#     for result in result_files:
+#         with open(os.path.join(results_dir, result), 'r') as f:
+#             results.extend(json.load(f))
+#         os.remove(os.path.join(results_dir, result))
+
+#     return json.dumps(results)
