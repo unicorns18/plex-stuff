@@ -1,5 +1,5 @@
 # MULTITHREAD_UPLOADER_PY     = False :eyes: # TODO: Implement multithreaded uploader
-TRANSMISSION_CHECK          = True
+TRANSMISSION_CHECK          = False
 TRANSMISSION_PORT           = 9091
 TRANSMISSION_HOST           = "localhost"
 BASE_URL_ORIONOID           = 'https://api.orionoid.com'

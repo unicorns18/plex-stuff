@@ -4,7 +4,7 @@ TODO: Write a docstring
 """
 import cProfile
 from collections import namedtuple
-from functools import partial
+from functools import partial, wraps
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
 import json
@@ -23,7 +23,8 @@ import ujson
 from alldebrid import APIError, AllDebrid
 from constants import BASE_URL, BASE_URL_ORIONOID, DEFAULT_API_KEY, TMDB_API_KEY, TOKEN
 from filters import clean_title
-from uploader import check_file_extensions
+from matching_algorithms import jaccard_similarity, levenshtein_distance
+from uploader import debrid_persistence_checks, check_file_extensions, extract_title_from_magnets_dn, process_magnet
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -475,41 +476,78 @@ def search_best_qualities(title: str, qualities_sets: List[List[str]], filename_
     print(f"Finished in {rounded_end_time} seconds")
     return results
 
-def main():
-    QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-    FILENAME_PREFIX = "result"
-    res = search_best_qualities(title="tt1160419", qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
-    with open("results.json", "w") as f:
-        json.dump(res, f, indent=4)
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16 MB
+
+CORS(app)
+
+QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
+FILENAME_PREFIX = "result"
+
+@app.route("/upload_to_debrid", methods=['POST'])
+def upload_to_debrid():
+    magnet = request.get_json()['magnet']
+
+    if not magnet:
+        print("Debug: Missing or invalid magnet parameter.")
+        return jsonify({'error': 'Missing or invalid magnet parameter.'}), 400
+
+    max_retries = 3
+    delay_between_retries = 5  # seconds
+
+    for attempt in range(max_retries):
+        print(f"Debug: Attempt {attempt + 1} of {max_retries}")
+        try:
+            response, status_code = process_magnet(magnet)
+
+            if status_code == 200:
+                title = extract_title_from_magnets_dn(magnet)
+                print(f"Debug: Title extracted - {title}")
+                persistence_check = debrid_persistence_checks(title=title)
+
+                if persistence_check['status'] == 'error':
+                    if attempt < max_retries - 1:  # If we haven't reached max retries yet, we sleep and then retry
+                        time.sleep(delay_between_retries)
+                        continue
+                    else:  # We've reached max retries, so we return an error
+                        return jsonify({'error': 'Max retries reached during process_magnet phase. DM unicorns pls.'}), 500
+                
+                for links in persistence_check['data']['links']:
+                    if 'filename' in links:
+                        filename = os.path.splitext(links['filename'])[0]
+                        similarity = jaccard_similarity(title, filename)
+                        confidence = similarity * 100
+                        print(f"Debug: {title} is {confidence}% similar to {links['filename']}")
+                        if confidence >= 60:
+                            return jsonify({'success': 'Magnet processed successfully and exists in AllDebrids links.'}), 200
+                        else:
+                            print(f"Debug: {title} is not in {links['filename']}")
+                            continue
+
+        except (ValueError, APIError) as exc:
+            print(f"Debug: Exception caught - {exc}")
+            return jsonify({'error': 'Something went wrong during the process_magnet phase. DM unicorns pls.'}), 500
+
+@app.route("/search_id", methods=["POST"])
+def search_id():
+    imdb_id = request.args.get('imdb_id')
+
+    if not imdb_id or not re.match(r'tt\d{7}', imdb_id):
+        return jsonify({'error': 'Invalid IMDb ID format.'}), 400
+
+    try:
+        res = search_best_qualities(title=imdb_id, qualities_sets=QUALITIES_SETS, filename_prefix=FILENAME_PREFIX)
+    except ValueError as ve:
+        print(ve)
+        return jsonify({'error': 'Invalid input value.'}), 400
+    except Exception as exc:
+        print(exc)
+        return jsonify({'error': 'Something went wrong during the search_best_qualities phase. DM unicorns pls.'}), 500
+    
+    return jsonify(res)
 
 if __name__ == "__main__":
-    cProfile.run('main()', 'output.prof', sort='cumtime')
-
-# from flask import Flask, request, jsonify
-# from flask_cors import CORS
-
-# app = Flask(__name__)
-# CORS(app)
-
-# QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]]
-# FILENAME_PREFIX = "result"
-
-# @app.route("/search", methods=["POST"])
-# def search():
-#     data = request.get_json()
-#     imdb_id = data["imdb_id"]
-
-#     results_dir = os.path.join(os.getcwd(), 'results')
-#     result_files = []
-#     start_time = time.time()
-#     while not result_files and time.time() - start_time < 60:  # wait up to 60 seconds
-#         result_files = [f for f in os.listdir(results_dir) if f.startswith(imdb_id)]
-#         time.sleep(1)  # wait a second before checking again
-
-#     results = []
-#     for result in result_files:
-#         with open(os.path.join(results_dir, result), 'r') as f:
-#             results.extend(json.load(f))
-#         os.remove(os.path.join(results_dir, result))
-
-#     return json.dumps(results)
+    app.run(host='0.0.0.0', port='1337', debug=True)
