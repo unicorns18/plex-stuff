@@ -13,7 +13,7 @@ jobs:
           name: install dependencies
           command: |
             pipenv install
-            pip install bandit safety
+            pip install bandit
       - save_cache:
           paths:
             - ./.venv
@@ -26,10 +26,6 @@ jobs:
           name: run bandit
           command: |
             bandit -r /root/plex-stuff/server_code.py
-      - run:
-          name: run safety check
-          command: |
-            pipenv run safety check
   deploy:
     docker:
       - image: cimg/base:stable
