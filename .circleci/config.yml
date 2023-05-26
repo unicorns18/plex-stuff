@@ -7,20 +7,17 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "requirements.txt" }}
+            - v1-dependencies-{{ checksum "Pipfile.lock" }}
             - v1-dependencies-
       - run:
           name: install dependencies
           command: |
-            python -m venv venv
-            . venv/bin/activate
-            pip install -r requirements.txt
+            pipenv install
       - save_cache:
           paths:
-            - ./venv
-          key: v1-dependencies-{{ checksum "requirements.txt" }}
+            - ./.venv
+          key: v1-dependencies-{{ checksum "Pipfile.lock" }}
       - run:
           name: run tests
           command: |
-            . venv/bin/activate
-            python -m unittest discover
+            pipenv run python -m unittest discover
