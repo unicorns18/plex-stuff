@@ -88,7 +88,6 @@ def search_id():
     if not imdb_id or not re.match(r'tt\d{7}', imdb_id):
         return jsonify({'error': 'Invalid IMDb ID format.'}), 400
 
-    # TODO: Doing this for now because im lazy and dont wanna test this gayness lolz
     qualities_sets = request.json.get('qualities_sets')
     if not qualities_sets or not all(isinstance(i, list) and all(isinstance(s, str) for s in i) for i in qualities_sets):
         return jsonify({'error': 'Invalid qualities_sets format. Expected list of lists of strs. (Example: QUALITIES_SETS = [["hd1080", "hd720"], ["hd4k"]])'}), 400
