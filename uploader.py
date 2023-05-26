@@ -10,6 +10,7 @@ import os
 import re
 import time
 from typing import Any, Dict, Iterable, List, Tuple, Union
+from urllib.parse import unquote
 from alldebrid import AllDebrid, APIError
 from flask import jsonify
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
@@ -22,107 +23,6 @@ logger.setLevel(logging.INFO)
 
 ad = AllDebrid(apikey=DEFAULT_API_KEY)
 
-# def process_magnet(magnet: str):
-#     """
-#     Process a magnet link, check if it's instant, upload it, and save uptobox.com torrent links.
-
-#     :param magnet: The magnet link to process.
-#     """
-
-#     def save_link(link: str) -> None:
-#         """
-#         Save a link using the ad module.
-
-#         :param link: The link to save.
-#         """
-#         if not link or not isinstance(link, str):
-#             print(f"Invalid link: {link}")
-#             return
-
-#         try:
-#             res_saved_links: Dict[str, Any] = ad.save_new_link(link=link)
-#             if res_saved_links['status'] == 'success':
-#                 print(f"Saved link: {link}")
-#             else:
-#                 print(f"Error saving link: {link}")
-#                 raise ValueError(f"Error saving link: {link}")
-#         except APIError as exc:
-#             print(f"Error saving link: {link}: {exc}")
-#         except ValueError as exc:
-#             print(f"Error saving link: {link}: {exc}")
-#         except Exception as exc:
-#             print(f"Error saving link: {link}: {exc}")
-
-#     def filter_uptobox_links(magnet_links: List[Dict[str, str]]) -> Iterable[str]:
-#         """
-#         Filter uptobox.com links from a list of magnet links.
-
-#         :param magnet_links: A list of magnet link dictionaries.
-#         :return: A generator yielding uptobox.com links.
-#         """
-#         if not isinstance(magnet_links, list):
-#             raise ValueError("The magnet_links argument must be a list.")
-
-#         for link in magnet_links:
-#             if not isinstance(link, dict):
-#                 raise ValueError(
-#                     "Each item in magnet_links must be a dictionary.")
-#             elif 'link' not in link:
-#                 raise ValueError(
-#                     "Each dictionary in magnet_links must contain a 'link' key.")
-#             elif not isinstance(link['link'], str):
-#                 raise ValueError(
-#                     "The 'link' value in the dictionaries in magnet_links must be a string.")
-#             elif 'uptobox.com' in link['link']:
-#                 yield link['link']
-
-#     start_time = time.perf_counter()
-
-#     # Check if the provided magnet is in the URL format
-#     if magnet.startswith('http'):
-#         try:
-#             magnet = ad.download_file_then_upload_to_alldebrid(magnet)
-#             print(f"Magnet: {magnet}")
-#         except (ValueError, APIError) as exc:
-#             print(f"Error downloading and uploading file to AllDebrid: {exc}")
-#             return
-
-#     try:
-#         res: Dict[str, Any] = ad.check_magnet_instant(magnet)
-#         instant: bool = res['data']['magnets'][0]['instant']
-#     except (ValueError, APIError) as exc:
-#         print(f"Error checking magnet instant: {exc}")
-#         return
-
-#     if instant:
-#         try:
-#             res_upload: Dict[str, Any] = ad.upload_magnets(magnet)
-#             upload_id: str = res_upload['data']['magnets'][0]['id']
-#             res_status: Dict[str, Any] = ad.get_magnet_status(upload_id)
-#             torrent_links: Iterable[str] = filter_uptobox_links(
-#                 res_status['data']['magnets']['links'])
-#         except (ValueError, APIError) as exc:
-#             print(f"Error uploading magnet or getting status: {exc}")
-#             return
-
-#         try:
-#             with concurrent.futures.ThreadPoolExecutor() as executor:
-#                 futures = {executor.submit(save_link, link)
-#                            for link in torrent_links}
-#                 for _ in concurrent.futures.as_completed(futures):
-#                     pass
-#         except (ValueError, APIError) as exc:
-#             print(f"Error processing torrent links: {exc}")
-#             return
-#     else:
-#         try:
-#             res_upload = ad.upload_magnets(magnet)
-#         except (ValueError, APIError) as exc:
-#             print(f"Error uploading magnet: {exc}")
-#             return
-
-#     end_time = time.perf_counter()
-#     print(f"Time elapsed: {end_time - start_time:0.4f} seconds")
 def process_magnet(magnet: str):
     """
     Process a magnet link, check if it's instant, upload it, and save uptobox.com torrent links.
@@ -233,10 +133,27 @@ def debrid_persistence_checks(title: str):
 
     if response['status'] == 'success':
         links = response['data']['links']
-        filtered_links = [link for link in links if title.lower() in link['filename'].lower()]
+
+        filtered_links = []
+        for link in links:
+            filename = link['filename'].lower()
+            confidence = 0
+            title_words = title.lower().split(" ")
+            
+            for word in title_words:
+                if word in filename:
+                    confidence += 10  # Increment confidence by 10 for each matching word
+
+            # Only add links to the filtered list if confidence is greater than 0
+            if confidence > 0:
+                link['confidence'] = confidence  # Add a confidence score to the link
+                filtered_links.append(link)
+
         return {'status': 'success', 'data': {'links': filtered_links}}
     else:
         return {'status': 'error', 'message': 'Failed to retrieve saved links.'}
+
+# print(debrid_persistence_checks("Rectify"))
 
 def extract_title_from_magnets_dn(magnet: str) -> str:
     """
@@ -260,10 +177,14 @@ def extract_title_from_magnets_dn(magnet: str) -> str:
             title = match.group(1)
             break
     
-    # Remove unwanted characters like '%20' or '%5B'
-    title = re.sub(r"%\w{2}", " ", title)
+    # Decode the URL-encoded string
+    title = unquote(title)
+    
+    # Replace unwanted characters like dots or minuses with space
+    title = re.sub(r"\.|-|_", " ", title)
     
     return title.strip()
+
 
 def make_request(session: requests.Session, data: Dict[str, Any], retries: int = 3):
     """

@@ -1,4 +1,9 @@
+from collections import Counter
+
+
 def jaccard_similarity(x, y):
-    intersection_cardinality = len(set.intersection(*[set(x), set(y)]))
-    union_cardinality = len(set.union(*[set(x), set(y)]))
-    return intersection_cardinality/float(union_cardinality)
+    x_counter = Counter(x)
+    y_counter = Counter(y)
+    intersection_cardinality = sum((x_counter & y_counter).values())
+    union_cardinality = sum((x_counter | y_counter).values())
+    return intersection_cardinality / float(union_cardinality)
