@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 "alldebrid.py" = "==1.0.1"
+setuptools = ">=65.5.1"
 beautifulsoup4 = "==4.10.0"
 httpx = "==0.24.0"
 pysimdjson = "==5.0.2"
