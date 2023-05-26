@@ -21,3 +21,29 @@ jobs:
           name: run tests
           command: |
             pipenv run python -m unittest discover
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:XyQ+4w8reTjwDTLRpVLnf+RGOO/EwVZjq+OTastskKU"
+      - run:
+          name: Deploy to DigitalOcean
+          command: |
+            ssh -o StrictHostKeyChecking=no root@165.22.12.28 << 'ENDSSH'
+            cd ~/plex-stuff
+            git pull
+            # Restart your application
+            ENDSSH
+workflows:
+  version: 2
+  build-and-deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main
