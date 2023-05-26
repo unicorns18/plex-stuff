@@ -32,13 +32,26 @@ jobs:
           name: Deploy to DigitalOcean
           command: |
             ssh -o StrictHostKeyChecking=no root@206.81.16.199 \<< 'ENDSSH'
+            set -e
             echo "Pulling latest code from repository..."
             cd ~/plex-stuff
             git pull
+            if [ $? -ne 0 ]; then
+                echo "Error pulling latest code."
+                exit 1
+            fi
             echo "Reloading systemd daemon to update service definitions..."
             sudo systemctl daemon-reload
-            echo "Restarting FBE Backend service..."
+            if [ $? -ne 0 ]; then
+                echo "Error reloading systemd daemon."
+                exit 1
+            fi
+            echo "Restarting pybackend service..."
             sudo systemctl restart pybackend.service
+            if [ $? -ne 0 ]; then
+                echo "Error restarting pybackend service."
+                exit 1
+            fi
             echo "Deployment successful and application restarted!"
             ENDSSH
 workflows:
@@ -52,4 +65,3 @@ workflows:
           filters:
             branches:
               only: main
-
