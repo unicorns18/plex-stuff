@@ -32,8 +32,12 @@ jobs:
           name: Deploy to DigitalOcean
           command: |
             ssh -o StrictHostKeyChecking=no root@206.81.16.199 \<< 'ENDSSH'
+            echo "Pulling latest code from repository..."
             cd ~/plex-stuff
             git pull
+            echo "Reloading systemd daemon to update service definitions..."
+            sudo systemctl daemon-reload
+            echo "Restarting FBE Backend service..."
             sudo systemctl restart pybackend.service
             echo "Deployment successful and application restarted!"
             ENDSSH
