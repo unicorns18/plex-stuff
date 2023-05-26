@@ -12,7 +12,7 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            /usr/local/bin/python -m venv venv
+            python -m venv venv
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
