@@ -31,7 +31,7 @@ jobs:
       - run:
           name: Deploy to DigitalOcean
           command: |
-            ssh -o StrictHostKeyChecking=no root@165.22.12.28 << 'ENDSSH'
+            ssh -o StrictHostKeyChecking=no root@165.22.12.28 \<< 'ENDSSH'
             cd ~/plex-stuff
             git pull
             # Restart your application
