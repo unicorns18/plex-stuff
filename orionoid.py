@@ -314,7 +314,8 @@ def get_cached_instants(alldebrid: 'AllDebrid', magnets: List[str]) -> List[Unio
             print("Failed to check magnets. Defaulting to False for all magnets.")
             return [False] * len(magnets)
         
-        return [magnet_data.get('instant', False) for magnet_data in checkmagnets['data']['magnets']]
+        return [magnet_data.get('cached', False) for magnet_data in checkmagnets['data']['magnets']]
+        # return [magnet_data.get('instant', False) for magnet_data in checkmagnets['data']['magnets']]
     except APIError as exc:
         print(f"APIError occured: {exc}")
     except ValueError as exc:
@@ -451,9 +452,8 @@ def search_best_qualities(
                 print(f"Could not get season data for {title}")
                 return
             total_seasons = season_data["total_seasons"]
-            # Generate all combinations
             all_combinations = list(itertools.product(range(1, total_seasons + 1), qualities_sets))
-            if season:  # If specific season is provided, filter all_combinations to only include this season
+            if season:
                 all_combinations = [combo for combo in all_combinations if combo[0] == season]
             futures = {executor.submit(process_quality, qualities, season): (qualities, season) for season, qualities in all_combinations}
         elif title_type == "movie":
