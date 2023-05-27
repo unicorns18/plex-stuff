@@ -45,7 +45,7 @@ jobs:
       - run:
           name: Deploy to DigitalOcean
           command: |
-            ssh -o StrictHostKeyChecking=no root@206.81.16.199 <<- 'ENDSSH'
+            ssh -o StrictHostKeyChecking=no root@206.81.16.199 \<<- 'ENDSSH'
               set -e
               echo "Pulling latest code from repository..."
               cd ~/plex-stuff
