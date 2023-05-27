@@ -21,7 +21,7 @@ import requests
 import simdjson as sj
 import ujson
 from alldebrid import APIError, AllDebrid
-from constants import BASE_URL, BASE_URL_ORIONOID, DEFAULT_API_KEY, TMDB_API_KEY, TOKEN
+from constants import BASE_URL, BASE_URL_ORIONOID, DEFAULT_API_KEY, MDBLIST_API_KEY, TMDB_API_KEY, TOKEN
 from filters import clean_title
 from matching_algorithms import jaccard_similarity
 from uploader import debrid_persistence_checks, check_file_extensions, extract_title_from_magnets_dn, process_magnet
@@ -328,7 +328,7 @@ multi_season_regex = re.compile(r'S\d{2}-S\d{2}', re.IGNORECASE)
 
 def get_title_type(title: str, year: Optional[int] = None):
     # Your API key
-    api_key = "uwk2jbhy7acivnyzpq44hh70y"
+    api_key = MDBLIST_API_KEY
 
     # IMDB ID pattern
     imdb_id_pattern = r"^tt\d+$"
