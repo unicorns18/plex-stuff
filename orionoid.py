@@ -255,7 +255,7 @@ def get_season_data_imdb(imdb_id: str, retries: int, backoff_factor: float) -> O
             search_params = {"api_key": TMDB_API_KEY, "external_source": "imdb_id"}
             search_url = f"{BASE_URL}/find/{imdb_id}?{urlencode(search_params)}"
             
-            response = req_session.get(search_url, timeout=10, verify=False)
+            response = req_session.get(search_url, timeout=10)
             response.raise_for_status()
             search_data = sj.loads(response.content)
 
@@ -265,7 +265,7 @@ def get_season_data_imdb(imdb_id: str, retries: int, backoff_factor: float) -> O
                 tv_show_id = tv_show["id"]
                 tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
 
-                tv_show_response = req_session.get(tv_show_url, timeout=10, verify=False)
+                tv_show_response = req_session.get(tv_show_url, timeout=10)
                 tv_show_response.raise_for_status()
                 tv_show_data = sj.loads(tv_show_response.content)
                 
@@ -286,7 +286,7 @@ def get_season_data_title(title: str, retries: int, backoff_factor: float) -> Op
             search_params = {"api_key": TMDB_API_KEY, "query": title}
             search_url = f"{BASE_URL}/search/tv?{urlencode(search_params)}"
             
-            response = req_session.get(search_url, timeout=10, verify=False)
+            response = req_session.get(search_url, timeout=10)
             response.raise_for_status()
             search_data = sj.loads(response.content)
 
@@ -296,7 +296,7 @@ def get_season_data_title(title: str, retries: int, backoff_factor: float) -> Op
                 tv_show_id = tv_show["id"]
                 tv_show_url = f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}"
 
-                tv_show_response = req_session.get(tv_show_url, timeout=10, verify=False)
+                tv_show_response = req_session.get(tv_show_url, timeout=10)
                 tv_show_response.raise_for_status()
                 tv_show_data = sj.loads(tv_show_response.content)
                 

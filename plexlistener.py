@@ -7,7 +7,8 @@ from typing import Dict
 import unicodedata
 import requests
 from bs4 import BeautifulSoup
-import xml.etree.ElementTree as ET
+# import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 import time
 from constants import X_PLEX_TOKEN
 
@@ -107,7 +108,7 @@ def check_availability_and_remove_from_watchlist(item_title: str) -> bool:
             print(f"Error occurred while fetching library data: {e}")
             continue  # skip to the next library
         try:
-            root: ET.Element = ET.fromstring(response.content)
+            root = ET.fromstring(response.content)
         except ET.ParseError as e:
             print(f"Error occurred while parsing XML: {e}")
             continue  # skip to the next library
