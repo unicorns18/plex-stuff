@@ -122,7 +122,7 @@ jobs:
               echo "Cloning latest code from repository..."
               mkdir -p ~/plex-stuff-new
               cd ~/plex-stuff-new
-              git clone https://github.com/your_username/your_repo.git .
+              git clone https://github.com/unicorns18/plex-stuff .
               if [ $? -ne 0 ]; then
                 echo "Error cloning latest code."
                 exit 1
