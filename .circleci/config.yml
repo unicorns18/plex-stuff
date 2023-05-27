@@ -1,17 +1,11 @@
 version: 2.1
 
-executors:
-  python-executor:
-    docker:
-      - image: cimg/python:3.8.12
-
 jobs:
   build:
     docker:
-      - image: python-executor
+      - image: python:3.8.12
     steps:
-      - checkout:
-          path: ~/plex-stuff
+      - checkout
       - restore_cache:
           keys:
             - v1-venv-{{ checksum ".venv.lock" }}
