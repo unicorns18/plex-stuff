@@ -3,12 +3,12 @@ version: 2.1
 jobs:
   build:
     docker:
-      - image: python:3.8.12
+      - image: python:3.10-slim
     steps:
       - checkout
       - restore_cache:
           keys:
-            - v1-venv-{{ checksum ".venv.lock" }}
+            - v1-venv-{{ checksum "Pipfile.lock" }}
             - v1-venv-
       - run:
           name: install dependencies
@@ -18,8 +18,9 @@ jobs:
             pipenv run pip install bandit
       - save_cache:
           paths:
+            - /root/.cache/pip
             - ./.venv
-          key: v1-venv-{{ checksum ".venv.lock" }}
+          key: v1-venv-{{ checksum "Pipfile.lock" }}
       - run:
           name: run tests
           command: |
