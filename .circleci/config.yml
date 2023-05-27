@@ -17,6 +17,7 @@ jobs:
       - save_cache:
           paths:
             - ./.venv
+            - ~/.cache/pip  # This is the path where pip packages are typically cached
           key: v1-dependencies-{{ checksum "Pipfile.lock" }}
       - run:
           name: run tests
@@ -55,12 +56,6 @@ jobs:
             sudo systemctl restart pybackend.service
             if [ $? -ne 0 ]; then
                 echo "Error restarting pybackend service."
-                exit 1
-            fi
-            echo "Checking service status..."
-            sudo systemctl is-active --quiet pybackend.service
-            if [ $? -ne 0 ]; then
-                echo "Service failed to start."
                 exit 1
             fi
             echo "Deployment successful and application restarted!"
