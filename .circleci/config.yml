@@ -117,15 +117,21 @@ jobs:
       - run:
           name: Deploy to DigitalOcean
           command: |
-            ssh -o StrictHostKeyChecking=no root@165.22.12.28 \<<- 'ENDSSH'
+            ssh -o StrictHostKeyChecking=no root@206.81.16.199 <<- 'ENDSSH'
               set -e
-              echo "Pulling latest code from repository..."
-              cd ~/plex-stuff
-              git pull
+              echo "Cloning latest code from repository..."
+              mkdir -p ~/plex-stuff-new
+              cd ~/plex-stuff-new
+              git clone https://github.com/your_username/your_repo.git .
               if [ $? -ne 0 ]; then
-                echo "Error pulling latest code."
+                echo "Error cloning latest code."
                 exit 1
               fi
+              # Do any necessary build steps here...
+              echo "Switching to new code..."
+              rm -rf ~/plex-stuff-old
+              mv ~/plex-stuff ~/plex-stuff-old
+              mv ~/plex-stuff-new ~/plex-stuff
               echo "Reloading systemd daemon to update service definitions..."
               sudo systemctl daemon-reload
               if [ $? -ne 0 ]; then
@@ -151,6 +157,3 @@ workflows:
           filters:
             branches:
               only: main
-
-
-# version: 2.1
