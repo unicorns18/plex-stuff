@@ -28,7 +28,7 @@ jobs:
       - run:
           name: run bandit
           command: |
-            bandit -r /root/plex-stuff/server_code.py
+            pipenv run bandit -r /root/plex-stuff/server_code.py
 
   deploy:
     docker:
