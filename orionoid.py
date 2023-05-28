@@ -2,9 +2,8 @@
 """
 TODO: Write a docstring
 """
-import cProfile
 from collections import namedtuple
-from functools import partial, wraps
+from functools import partial
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
 import json
@@ -19,12 +18,11 @@ import requests_cache
 import urllib3
 import requests
 import simdjson as sj
-import ujson
 from alldebrid import APIError, AllDebrid
 from constants import BASE_URL, BASE_URL_ORIONOID, DEFAULT_API_KEY, MDBLIST_API_KEY, TMDB_API_KEY, TOKEN
 from filters import clean_title
-from matching_algorithms import jaccard_similarity
-from uploader import debrid_persistence_checks, check_file_extensions, extract_title_from_magnets_dn, process_magnet
+# from matching_algorithms import jaccard_similarity
+from uploader import check_file_extensions
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
