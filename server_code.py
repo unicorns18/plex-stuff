@@ -2,9 +2,11 @@ from functools import wraps
 import os
 import re
 import time
-from alldebrid import APIError
+from alldebrid import APIError, AllDebrid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from constants import DEFAULT_API_KEY
+from emby import get_library_ids
 from matching_algorithms import jaccard_similarity
 
 from orionoid import search_best_qualities
@@ -142,6 +144,30 @@ def search_id():
 @app.route('/ping', methods=['GET'])
 def ping():
     return jsonify({'success': 'pong'}), 200
+
+@app.route('/emby_library_items', methods=['GET'])
+@api_key_required
+def emby_library_items():
+    apikey = request.args.get('emby_apikey')
+    if not apikey:
+        return jsonify({'error': 'Missing or invalid emby_apikey parameter.'}), 400
+    
+    ids = get_library_ids(apikey)
+    if not ids:
+        return jsonify({'error': 'No library items found.'}), 404
+    
+    # TODO: Implement getting items in library IDs
+
+    return jsonify(ids), 200
+
+@app.route('/get_magnet_states', methods=['GET'])
+@api_key_required
+def get_magnet_states():
+    ad = AllDebrid(apikey=DEFAULT_API_KEY)
+
+    # TODO: Implement getting magnet states
+
+    return jsonify({'error': 'Not implemented yet.'}), 501
 
 # if __name__ == "__main__":
 #     app.run(host='0.0.0.0', port='1337', debug=True)

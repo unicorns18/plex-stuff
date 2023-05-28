@@ -7,14 +7,19 @@ from constants import EMBY_API_KEY
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 def get_library_ids(api_key):
-    response = requests.get("https://88.99.242.111/unicorns/emby/Items", params={"api_key": api_key})
+    response = requests.get("https://88.99.242.111/unicorns/emby/Items", params={"api_key": api_key}, verify=False)
 
     if response.status_code == 200:
         libraries = json.loads(response.text)
+        print(libraries)
         return [library["Id"] for library in libraries["Items"]]
     else:
         print("Failed to get libraries.")
         return []
+
+def get_items_in_library(api_key, library_id):
+    # TODO: Write this code for getting items in a library.
+    return {"error": "Not implemented yet."}
 
 def refresh_library(api_key, library_id):
     headers = {
@@ -29,6 +34,7 @@ def refresh_library(api_key, library_id):
     response = requests.post(
         f"https://88.99.242.111/unicorns/emby/Items/{library_id}/Refresh?Recursive=true&ImageRefreshMode=Default&MetadataRefreshMode=Default&ReplaceAllImages=false&ReplaceAllMetadata=false",
         headers=headers,
+        verify=False
     )
     print(response.status_code)
 
@@ -42,4 +48,4 @@ def refresh_all_libraries(api_key):
     for library_id in library_ids:
         refresh_library(api_key, library_id)
 
-refresh_all_libraries(EMBY_API_KEY)
+# refresh_all_libraries(EMBY_API_KEY)
