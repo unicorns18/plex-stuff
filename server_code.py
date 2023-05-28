@@ -5,7 +5,7 @@ import time
 from alldebrid import APIError, AllDebrid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from constants import DEFAULT_API_KEY
+# from constants import DEFAULT_API_KEY
 from emby import get_library_ids
 from matching_algorithms import jaccard_similarity
 
@@ -163,7 +163,7 @@ def emby_library_items():
 @app.route('/get_magnet_states', methods=['GET'])
 @api_key_required
 def get_magnet_states():
-    ad = AllDebrid(apikey=DEFAULT_API_KEY)
+    ad = AllDebrid(apikey="tXQQw2JPx8iKEyeeOoJE")
 
     # TODO: Implement getting magnet states
 
