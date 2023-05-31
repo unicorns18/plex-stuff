@@ -5,7 +5,6 @@ import time
 from alldebrid import APIError, AllDebrid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-# from constants import DEFAULT_API_KEY
 from emby import get_library_ids
 from matching_algorithms import jaccard_similarity
 
@@ -20,6 +19,12 @@ CORS(app)
 API_KEY = "suitloveshisapikeyswtfmomentweirdchamp"
 
 def api_key_required(f):
+    """
+    Decorator function to check if the API key in the request headers is valid.
+
+    :param f: The function to be decorated.
+    :return: The decorated function, which will check the API key before executing.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'apikey' in request.headers and request.headers['apikey'] == API_KEY:
@@ -28,10 +33,14 @@ def api_key_required(f):
             return jsonify({'error': 'Missing or invalid API key.'}), 401
     return decorated_function
 
-
 @app.route("/upload_to_debrid", methods=['POST'])
 @api_key_required
 def upload_to_debrid():
+    """
+    Endpoint to upload a magnet link to Debrid. The magnet link should be provided in the body of the POST request.
+
+    :return: A JSON response indicating success or failure of the upload operation.
+    """
     magnet = request.get_json()['magnet']
 
     if not magnet:
@@ -85,6 +94,11 @@ def upload_to_debrid():
 @app.route("/search_id", methods=["POST"])
 @api_key_required
 def search_id():
+    """
+    Endpoint to search for a movie or show by its IMDb ID. The IMDb ID and various search parameters should be provided in the body of the POST request.
+
+    :return: A JSON response containing search results, or an error message if the search failed.
+    """
     imdb_id = request.args.get('imdb_id')
 
     if not imdb_id or not re.match(r'tt\d{7}', imdb_id):
@@ -143,11 +157,21 @@ def search_id():
 
 @app.route('/ping', methods=['GET'])
 def ping():
+    """
+    Endpoint to check if the server is running.
+
+    :return: A JSON response indicating that the server is running.
+    """
     return jsonify({'success': 'pong'}), 200
 
 @app.route('/emby_library_items', methods=['GET'])
 @api_key_required
 def emby_library_items():
+    """
+    Endpoint to get the items in the Emby library. The Emby API key should be provided as a query parameter.
+
+    :return: A JSON response containing the library items, or an error message if the operation failed.
+    """
     apikey = request.args.get('emby_apikey')
     if not apikey:
         return jsonify({'error': 'Missing or invalid emby_apikey parameter.'}), 400
@@ -163,11 +187,40 @@ def emby_library_items():
 @app.route('/get_magnet_states', methods=['GET'])
 @api_key_required
 def get_magnet_states():
-    ad = AllDebrid(apikey="tXQQw2JPx8iKEyeeOoJE")
+    """
+    Endpoint to get the status of a magnet upload.
 
-    # TODO: Implement getting magnet states
+    :return: A JSON response containing the status of the magnet upload, or an error message if the operation failed.
+    """
+    ad = AllDebrid(apikey="EA9ofGVIsr2X01Mwjr9t")
 
-    return jsonify({'error': 'Not implemented yet.'}), 501
+    magnet_upload = ad.upload_magnets(magnets=["magnet:?xt=urn:btih:EE23A73FD36A8B17F0A13814A56EF853DC0B3573&dn=%5BBitsearch.to%5D%20%D0%A0%D0%B8%D0%BA%20%D0%B8%20%D0%9C%D0%BE%D1%80%D1%82%D0%B8.Rick%20and%20Morty.S01.2160p.Ultramarinad&tr=udp%3A%2F%2Ftracker.bitsearch.to%3A1337%2Fannounce"])
 
-# if __name__ == "__main__":
-#     app.run(host='0.0.0.0', port='1337', debug=True)
+    if magnet_upload.get("status") != "success":
+        return jsonify({'error': 'Something went wrong during the upload_magnets phase. DM unicorns pls.'}), 500
+
+    magnet_id = magnet_upload["data"]["magnets"][0]["id"]
+    resp = ad.get_magnet_status(magnet_id=magnet_id, counter=1)
+
+    if resp.get("status") != "success":
+        return jsonify({'error': f'Something went wrong while getting magnet status for ID {magnet_id}. DM unicorns pls.'}), 500
+
+    return jsonify(resp), 200
+
+@app.route('/restart_magnet', methods=['POST'])
+@api_key_required
+def restart_magnet():
+    """
+    Endpoint to restart a magnet upload. The magnet ID should be provided in the body of the POST request.
+
+    :return: A JSON response indicating success or failure of the restart operation.
+    """
+    ad = AllDebrid(apikey="EA9ofGVIsr2X01Mwjr9t")
+    magnet_id = request.json.get('magnet_id')
+
+    if not magnet_id:
+        return jsonify({'error': 'Missing or invalid magnet_id parameter.'}), 400
+    
+    resp = ad.restart_magnet(magnet_id=magnet_id)
+
+    return jsonify(resp), 200
