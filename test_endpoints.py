@@ -115,3 +115,48 @@ def test_restart_magnet_invalid_id(base_url):
     assert response.status_code == 200, f"Expected status code 200, but got {response.status_code}"
     assert 'status' in response.json() and response.json()['status'] == 'success', f"Expected 'status' to be 'success', but got {response.json()}"
     assert 'data' in response.json() and response.json()['data'] == 'Magnet is processing or completed', f"Expected specific data message in response, but got {response.json()}"
+
+# def test_get_emby_library_items(base_url, debug_level):
+#     url = f"{base_url}/emby_library_items"
+#     headers = {"Content-Type": "application/json", "apikey": "suitloveshisapikeyswtfmomentweirdchamp"}
+#     data = {"emby_apikey": "354da7ea720d405c9171f82344c76e69"}
+#     response = requests.get(url, headers=headers, json=data)
+#     assert response.status_code == 200
+#     assert response.json()['status'] == 'success'
+#     assert isinstance(response.json()['data'], list), "Data returned is not a list"
+#     if response.json()['data']:
+#         assert 'id' in response.json()['data'][0], "Returned item does not contain 'id'"
+#         assert 'name' in response.json()['data'][0], "Returned item does not contain 'name'"
+#         assert 'type' in response.json()['data'][0], "Returned item does not contain 'type'"
+
+# def test_get_emby_library_items_missing_apikey(base_url):
+#     url = f"{base_url}/emby_library_items"
+#     headers = {"Content-Type": "application/json", "apikey": "suitloveshisapikeyswtfmomentweirdchamp"}
+#     data = {}
+#     response = requests.get(url, headers=headers, json=data)
+#     assert response.status_code == 400
+#     assert response.json()['error'] == 'Missing or invalid emby_apikey parameter.'
+
+# def test_get_emby_library_items_invalid_apikey(base_url):
+#     url = f"{base_url}/emby_library_items"
+#     headers = {"Content-Type": "application/json", "apikey": "suitloveshisapikeyswtfmomentweirdchamp"}
+#     data = {"emby_apikey": "invalidapikey"}
+#     response = requests.get(url, headers=headers, json=data)
+#     assert response.status_code == 401
+#     assert response.json()['error'] == 'Invalid Emby API key.'
+
+# def test_get_emby_library_items_no_users(base_url):
+#     url = f"{base_url}/emby_library_items"
+#     headers = {"Content-Type": "application/json", "apikey": "suitloveshisapikeyswtfmomentweirdchamp"}
+#     data = {"emby_apikey": "apikey_with_no_users"}
+#     response = requests.get(url, headers=headers, json=data)
+#     assert response.status_code == 404
+#     assert response.json()['error'] == 'No users found.'
+
+# def test_get_emby_library_items_no_library_items(base_url):
+#     url = f"{base_url}/emby_library_items"
+#     headers = {"Content-Type": "application/json", "apikey": "suitloveshisapikeyswtfmomentweirdchamp"}
+#     data = {"emby_apikey": "apikey_with_no_library_items"}
+#     response = requests.get(url, headers=headers, json=data)
+#     assert response.status_code == 404
+#     assert response.json()['error'] == 'No library items found.'

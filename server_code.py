@@ -1,11 +1,13 @@
 from functools import wraps
+import json
 import os
 import re
 import time
 from alldebrid import APIError, AllDebrid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from emby import get_library_ids
+from emby import get_libraries, get_library_ids, get_user_ids, validate_emby_apikey
+from exceptions import EmbyError
 from matching_algorithms import jaccard_similarity
 
 from orionoid import search_best_qualities
@@ -174,16 +176,39 @@ def emby_library_items():
     """
     apikey = request.get_json()
     apikey = apikey.get('emby_apikey')
+    print(apikey)
     if not apikey:
         return jsonify({'error': 'Missing or invalid emby_apikey parameter.'}), 400
     
-    ids = get_library_ids(apikey)
-    if not ids:
-        return jsonify({'error': 'No library items found.'}), 404
+    if not validate_emby_apikey(apikey):
+        return jsonify({'error': 'Invalid Emby API key.'}), 401
     
-    # TODO: Implement getting items in library IDs
+    try:
+        user_ids = get_user_ids(apikey)
+    except EmbyError as e:
+        if str(e) == 'No users found.':
+            return jsonify({'error': str(e)}), 404
+        elif str(e) == 'Invalid Emby API key.':
+            return jsonify({'error': str(e)}), 401
+    
+    all_items = []
+    for user_id in user_ids:
+        try:
+            libraries = get_libraries(apikey, user_id)
+        except EmbyError as e:
+            if str(e) == 'No library items found.':
+                return jsonify({'error': str(e)}), 404
 
-    return jsonify({'status': 'success', 'data': ids}), 200
+        items = []
+        for item in libraries["Items"]:
+            items.append({
+                'id': item['Id'],
+                'name': item['Name'],
+                'type': item['Type'],
+            })
+        all_items.extend(items)
+
+    return jsonify({'status': "success", 'data': all_items}), 200
 
 @app.route('/get_magnet_states', methods=['GET'])
 @api_key_required

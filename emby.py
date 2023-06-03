@@ -3,8 +3,17 @@ import requests
 import warnings
 
 from constants import EMBY_API_KEY
+from exceptions import EmbyError
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
+
+def validate_emby_apikey(apikey):
+    url = f"https://88.99.242.111/unicorns/emby/Users?api_key={apikey}"
+    response = requests.get(url, verify=False)
+    if response.status_code == 200:
+        return True
+    else:
+        return False
 
 def get_library_ids(api_key):
     response = requests.get("https://88.99.242.111/unicorns/emby/Items", params={"api_key": api_key}, verify=False)
@@ -17,10 +26,43 @@ def get_library_ids(api_key):
         print("Failed to get libraries.")
         return []
 
-def get_items_in_library(api_key, library_id):
-    # TODO: Write this code for getting items in a library.
-    return {"error": "Not implemented yet."}
+def get_user_ids(api_key):
+    response = requests.get("https://88.99.242.111/unicorns/emby/Users", headers={"X-MediaBrowser-Token": api_key}, verify=False)
 
+    if response.status_code == 200:
+        users = json.loads(response.text)
+        user_ids = [user["Id"] for user in users]
+        if not user_ids:
+            raise EmbyError('No users found.')
+        return user_ids
+    else:
+        print("Failed to get users.")
+        raise EmbyError('Invalid Emby API key.')
+
+
+def get_libraries(api_key, user_id):
+    url = f"https://88.99.242.111/unicorns/emby/Users/{user_id}/Items"
+    headers = {
+        "X-MediaBrowser-Token": api_key,
+        "Accept": "application/json",
+    }
+    params = {
+        "Recursive": "true",
+        "IncludeItemTypes": "Movie,Series",
+        "Fields": "BasicSyncInfo",
+    }
+    response = requests.get(url, headers=headers, params=params, verify=False)
+
+    if response.status_code == 200:
+        libraries = response.json()
+        if not libraries['Items']:
+            raise EmbyError('No library items found.')
+        return libraries
+    else:
+        print(f"Error {response.status_code}: {response.text}")
+        raise EmbyError('Invalid Emby API key.')
+
+    
 def refresh_library(api_key, library_id):
     headers = {
         "X-Emby-Client": "Emby Web",
@@ -48,4 +90,12 @@ def refresh_all_libraries(api_key):
     for library_id in library_ids:
         refresh_library(api_key, library_id)
 
-# refresh_all_libraries(EMBY_API_KEY)
+# if __name__ == "__main__":
+#     user_ids = get_user_ids(EMBY_API_KEY)
+#     if user_ids:
+#         libraries = get_libraries(EMBY_API_KEY, user_ids[0])
+#         if libraries:
+#             for item in libraries["Items"]:
+#                 print(f"{item['Id']}: {item['Name']} ({item['Type']})")
+#     else:
+#         print("No users found.")

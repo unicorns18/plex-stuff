@@ -21,3 +21,6 @@ class RequestException(Exception):
     """
     Custom exception.
     """
+
+class EmbyError(Exception):
+    pass
