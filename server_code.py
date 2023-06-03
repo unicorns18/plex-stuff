@@ -101,7 +101,7 @@ def search_id():
     """
     imdb_id = request.args.get('imdb_id')
 
-    if not imdb_id or not re.match(r'tt\d{7}', imdb_id):
+    if not imdb_id:# or not re.match(r'tt\d{7}', imdb_id):
         return jsonify({'error': 'Invalid IMDb ID format.'}), 400
 
     qualities_sets = request.json.get('qualities_sets')
@@ -153,7 +153,7 @@ def search_id():
     if not res:
         return jsonify({'error': 'No results found.'}), 404
     
-    return jsonify(res), 200
+    return jsonify({'status': "success", 'data': res}), 200
 
 @app.route('/ping', methods=['GET'])
 def ping():
@@ -172,7 +172,8 @@ def emby_library_items():
 
     :return: A JSON response containing the library items, or an error message if the operation failed.
     """
-    apikey = request.args.get('emby_apikey')
+    apikey = request.get_json()
+    apikey = apikey.get('emby_apikey')
     if not apikey:
         return jsonify({'error': 'Missing or invalid emby_apikey parameter.'}), 400
     
@@ -182,7 +183,7 @@ def emby_library_items():
     
     # TODO: Implement getting items in library IDs
 
-    return jsonify(ids), 200
+    return jsonify({'status': 'success', 'data': ids}), 200
 
 @app.route('/get_magnet_states', methods=['GET'])
 @api_key_required
@@ -205,8 +206,7 @@ def get_magnet_states():
     if resp.get("status") != "success":
         return jsonify({'error': f'Something went wrong while getting magnet status for ID {magnet_id}. DM unicorns pls.'}), 500
 
-    return jsonify(resp), 200
-
+    return jsonify({'status': 'success', 'data': resp['data']['magnets']}), 200
 @app.route('/restart_magnet', methods=['POST'])
 @api_key_required
 def restart_magnet():
@@ -216,11 +216,15 @@ def restart_magnet():
     :return: A JSON response indicating success or failure of the restart operation.
     """
     ad = AllDebrid(apikey="EA9ofGVIsr2X01Mwjr9t")
-    magnet_id = request.json.get('magnet_id')
+    magnet_id = request.get_json()
+    magnet_id = magnet_id.get('magnet_id')
 
     if not magnet_id:
         return jsonify({'error': 'Missing or invalid magnet_id parameter.'}), 400
     
-    resp = ad.restart_magnet(magnet_id=magnet_id)
+    try:
+        resp = ad.restart_magnet(magnet_id=magnet_id)
+    except APIError:
+        return jsonify({'status': 'success', 'data': f'Magnet is processing or completed'}), 200
 
-    return jsonify(resp), 200
+    return jsonify({'status': 'success', 'data': resp['data']['message']}), 200
