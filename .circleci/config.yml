@@ -1,5 +1,14 @@
 version: 2.1
 
+
+Your CircleCI configuration is already designed to start the server first and then run the tests. However, starting the server and running the tests are two separate steps and CircleCI runs them concurrently, which might cause the tests to run before the server has fully started.
+
+You can fix this issue by modifying the configuration to add a delay before the tests are run, ensuring that the server has enough time to start. Here's how you can modify your configuration:
+
+yaml
+Copy code
+version: 2.1
+
 jobs:
   build:
     docker:
@@ -25,11 +34,10 @@ jobs:
           name: start server
           command: |
             pipenv run python server_code.py &
-          background: true
+            sleep 10  # delay to allow server to start
       - run:
           name: run tests
           command: |
-            sleep 5  # give the server some time to start
             pipenv run pytest test_endpoints.py
       - run:
           name: run bandit
