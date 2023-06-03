@@ -1,11 +1,24 @@
 import json
+import re
 import requests
 import warnings
+
+import urllib3
 
 from constants import EMBY_API_KEY
 from exceptions import EmbyError
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
+
+def is_safe_url(url):
+    trusted_domains = ['88.99.242.111']
+    pattern = r'^https?://([^/:]+)'
+    match = re.match(pattern, url)
+    if match:
+        domain = match.group(1)
+        if domain in trusted_domains:
+            return True
+    return False
 
 def validate_emby_apikey(apikey):
     url = f"https://88.99.242.111/unicorns/emby/Users?api_key={apikey}"
@@ -40,8 +53,32 @@ def get_user_ids(api_key):
         raise EmbyError('Invalid Emby API key.')
 
 
+# def get_libraries(api_key, user_id):
+#     url = f"https://88.99.242.111/unicorns/emby/Users/{user_id}/Items"
+#     headers = {
+#         "X-MediaBrowser-Token": api_key,
+#         "Accept": "application/json",
+#     }
+#     params = {
+#         "Recursive": "true",
+#         "IncludeItemTypes": "Movie,Series",
+#         "Fields": "BasicSyncInfo",
+#     }
+#     response = requests.get(url, headers=headers, params=params, verify=False)
+
+#     if response.status_code == 200:
+#         libraries = response.json()
+#         if not libraries['Items']:
+#             raise EmbyError('No library items found.')
+#         return libraries
+#     else:
+#         print(f"Error {response.status_code}: {response.text}")
+#         raise EmbyError('Invalid Emby API key.')
 def get_libraries(api_key, user_id):
     url = f"https://88.99.242.111/unicorns/emby/Users/{user_id}/Items"
+    if not is_safe_url(url):
+        raise ValueError('Invalid URL.')
+
     headers = {
         "X-MediaBrowser-Token": api_key,
         "Accept": "application/json",
@@ -61,7 +98,6 @@ def get_libraries(api_key, user_id):
     else:
         print(f"Error {response.status_code}: {response.text}")
         raise EmbyError('Invalid Emby API key.')
-
     
 def refresh_library(api_key, library_id):
     headers = {
