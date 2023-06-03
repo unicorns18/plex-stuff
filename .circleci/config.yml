@@ -22,11 +22,6 @@ jobs:
             - ./.venv
           key: v1-venv-{{ checksum "Pipfile.lock" }}
       - run:
-          name: Start server
-          command: |
-            pipenv run python /root/plex-stuff/server_code.py &
-            sleep 5
-      - run:
           name: run tests
           command: |
             pipenv run python -m unittest discover
