@@ -92,7 +92,11 @@ def process_magnet(magnet: str):
 
     try:
         res: Dict[str, Any] = ad.check_magnet_instant(magnet)
-        instant: bool = res['data']['magnets'][0]['instant']
+        if 'data' in res and 'magnets' in res['data'] and len(res['data']['magnets']) > 0 and 'instant' in res['data']['magnets'][0]:
+            instant: bool = res['data']['magnets'][0]['instant']
+        else:
+            print("Error checking magnet instant: Key 'instant' not found in response")
+            return error_response, 500
     except (ValueError, APIError) as exc:
         print(f"Error checking magnet instant: {exc}")
         return error_response, 500
