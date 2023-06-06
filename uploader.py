@@ -8,10 +8,9 @@ import logging
 import re
 import time
 from typing import Any, Dict, List, Tuple, Union
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from alldebrid import AllDebrid, APIError
 from flask import jsonify
-from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_result
 import requests
 
 from constants import (
@@ -400,143 +399,153 @@ def is_error(exception):
     return isinstance(exception, (ValueError, APIError))
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_fixed(2),
-    retry_error_callback=is_error,
-    retry=retry_if_result(is_none),
-)
+def get_magnet_instant_data(magnet_uri):
+    """
+    Calls a method from `ad` to check the magnet link instantaneously.
+
+    Parameters
+    ----------
+    magnet_uri: str
+        Magnet URI link.
+
+    Returns
+    -------
+    dict, str
+        Response dictionary from the `ad.check_magnet_instant` method, and error message if any.
+    """
+    try:
+        return ad.check_magnet_instant(magnets=magnet_uri)
+    except (APIError, ValueError) as exc:
+        return False, f"Error checking magnet instant: {exc}"
+
+def fetch_excluded_files_from_magnet_data(magnet_data):
+    """
+    Fetches files from magnet data that have extensions included in the EXCLUDED_EXTENSIONS list.
+
+    Parameters
+    ----------
+    magnet_data: dict
+        Response dictionary from the `ad.check_magnet_instant` method.
+
+    Returns
+    -------
+    list
+        List of files that have extensions included in the EXCLUDED_EXTENSIONS list.
+    """
+    files = magnet_data["data"]["magnets"][0]["files"]
+    return [
+        n["n"]
+        for n in files
+        for ext in EXCLUDED_EXTENSIONS
+        if n["n"].endswith(ext)
+    ]
+
+def fetch_excluded_files_from_torrent_data(torrent_data):
+    """
+    Fetches files from torrent metadata that have extensions included in the EXCLUDED_EXTENSIONS list.
+
+    Parameters
+    ----------
+    torrent_data: dict
+        Response dictionary from the `fetch_torrent_metadata` method.
+
+    Returns
+    -------
+    list
+        List of files that have extensions included in the EXCLUDED_EXTENSIONS list.
+    """
+    return [
+        file["name"]
+        for file in torrent_data["files"]
+        for ext in EXCLUDED_EXTENSIONS
+        if file["name"].endswith(ext)
+    ]
+
+def generate_result_with_excluded_files(excluded_files, source):
+    """
+    Generates the result message based on whether excluded files were found or not.
+
+    Parameters
+    ----------
+    excluded_files: list
+        List of files that have extensions included in the EXCLUDED_EXTENSIONS list.
+    source: str
+        String that indicates the source from which the files were fetched.
+
+    Returns
+    -------
+    tuple
+        Tuple containing a boolean value indicating whether excluded files were found or not,
+        and a string message.
+    """
+    if excluded_files:
+        return (
+            True,
+            f"File extension found: {excluded_files}. "
+            f"Extensions found: {EXCLUDED_EXTENSIONS}.",
+        )
+    return (
+        False,
+        f"No excluded extensions found in {source} files.",
+    )
+
+def check_magnet_uri(uri: str):
+    """
+    Checks magnet uri type, and if it is a valid URI.
+
+    Parameters
+    ----------
+    uri: str
+        Input URI
+
+    Returns
+    -------
+    str
+        Valid magnet URI
+
+    Raises
+    ------
+    ValueError
+        If the URI is not valid or not a magnet link
+    """
+
+    parsed = urlparse(uri)
+    magnet_pattern = r'magnet:\?xt=urn:[a-z0-9]+:[a-z0-9]{32,40}&dn=.*&tr=.*'
+    match = re.fullmatch(magnet_pattern, uri)
+
+    if all([parsed.scheme, parsed.netloc, parsed.path]) and match:
+        return uri
+    raise ValueError("The provided URI is not a valid magnet URI.")
+
 def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, None]]:
     """
-    TODO: Add a docstring to this method
+    Checks the provided URI for file extensions that are included in the EXCLUDED_EXTENSIONS list.
+
+    Parameters
+    ----------
+    uri: Union[str, List[str]]
+        URI(s) to check.
+
+    Returns
+    -------
+    Tuple[bool, Union[str, None]]
+        Tuple containing a boolean value indicating whether excluded files were found or not,
+        and a string message.
     """
     result = (False, "Transmission check is not enabled.")
 
-    if isinstance(uri, str) and not uri.startswith("magnet:"):
-        try:
-            magnet_uri = ad._download_and_upload_single_file(
-                uri
-            )  # pylint: disable=protected-access
-        except (ValueError, APIError) as exc:
-            result = (
-                False,
-                f"Error downloading and uploading file to AllDebrid: {exc} "
-                "(check_file_extensions)",
-            )
-    else:
-        magnet_uri = uri
+    magnet_uri = check_magnet_uri(uri)
 
-    try:
-        res = ad.check_magnet_instant(magnets=magnet_uri)
-    except (APIError, ValueError) as exc:
-        result = False, f"Error checking magnet instant: {exc}"
-    else:
-        if res["data"]["magnets"][0]["instant"]:
-            files = res["data"]["magnets"][0]["files"]
-            excluded_files = [
-                n["n"]
-                for n in files
-                for ext in EXCLUDED_EXTENSIONS
-                if n["n"].endswith(ext)
-            ]
+    res, error_message = get_magnet_instant_data(magnet_uri)
 
-            if excluded_files:
-                result = (
-                    True,
-                    f"File extension found: {excluded_files}. "
-                    f"Extensions found: {EXCLUDED_EXTENSIONS}.",
-                )
-            else:
-                result = (
-                    False,
-                    "No excluded extensions found in magnet files. (AllDebrid)",
-                )
-        elif TRANSMISSION_CHECK:
-            resp = fetch_torrent_metadata(uri)
-            excluded_files = [
-                file["name"]
-                for file in resp["files"]
-                for ext in EXCLUDED_EXTENSIONS
-                if file["name"].endswith(ext)
-            ]
-
-            if excluded_files:
-                result = (
-                    True,
-                    f"File extension found: {excluded_files}. "
-                    f"Extensions found: {EXCLUDED_EXTENSIONS}.",
-                )
-            else:
-                result = (
-                    False,
-                    "No excluded extensions found in torrent metadata. (Transmission)",
-                )
+    if error_message:
+        result = res, error_message
+    elif res["data"]["magnets"][0]["instant"]:
+        excluded_files = fetch_excluded_files_from_magnet_data(res)
+        result = generate_result_with_excluded_files(excluded_files, "magnet")
+    elif TRANSMISSION_CHECK:
+        resp = fetch_torrent_metadata(uri)
+        excluded_files = fetch_excluded_files_from_torrent_data(resp)
+        result = generate_result_with_excluded_files(excluded_files, "torrent metadata")
 
     return result
-
-
-# def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, None]]:
-#     """
-#     This function checks for excluded file extensions in a given magnet link or URI.
-
-#     Parameters
-#     ----------
-#     uri : Union[str, List[str]]
-#         A string or list of strings representing the magnet links or URIs to check.
-
-#     Returns
-#     -------
-#     Tuple[bool, Union[str, None]]
-#         A tuple where the first element is a boolean representing whether an excluded extension was found (True)
-#         or not (False), and the second element is a string describing the result of the operation or None if
-#         there was no error.
-#     """
-#     if isinstance(uri, str) and not uri.startswith("magnet:"):
-#         try:
-#             magnet_uri = ad._download_and_upload_single_file(uri)
-#         except (ValueError, APIError) as exc:
-#             return (
-#                 False,
-#                 f"Error downloading and uploading file to AllDebrid: {exc} "
-#                 "(check_file_extensions)"
-#             )
-#     else:
-#         magnet_uri = uri
-
-#     try:
-#         res = ad.check_magnet_instant(magnets=magnet_uri)
-#     except (APIError, ValueError) as exc:
-#         return False, f"Error checking magnet instant: {exc}"
-
-#     if res["data"]["magnets"][0]["instant"]:
-#         files = res["data"]["magnets"][0]["files"]
-#         excluded_files = [
-#             n["n"] for n in files for ext in EXCLUDED_EXTENSIONS if n["n"].endswith(ext)
-#         ]
-
-#         if excluded_files:
-#             return (
-#                 True,
-#                 f"File extension found: {excluded_files}. "
-#                 f"Extensions found: {EXCLUDED_EXTENSIONS}."
-#             )
-
-#         return False, "No excluded extensions found in magnet files. (AllDebrid)"
-
-#     elif TRANSMISSION_CHECK:
-#         resp = fetch_torrent_metadata(uri)
-#         excluded_files = [
-#             file["name"] for file in resp["files"]
-#             for ext in EXCLUDED_EXTENSIONS if file["name"].endswith(ext)
-#         ]
-
-#         if excluded_files:
-#             return (
-#                 True,
-#                 f"File extension found: {excluded_files}. "
-#                 f"Extensions found: {EXCLUDED_EXTENSIONS}."
-#             )
-
-#         return False, "No excluded extensions found in torrent metadata. (Transmission)"
-
-#     return False, "Transmission check is not enabled."
