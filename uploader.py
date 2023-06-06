@@ -45,13 +45,18 @@ def filter_uptobox_links(magnet_links: List[Dict[str, str]]) -> List[str]:
         if not isinstance(link, dict):
             raise ValueError("Each item in magnet_links must be a dictionary.")
         if "link" not in link:
-            raise ValueError("Each dictionary in magnet_links must contain a 'link' key.")
+            raise ValueError(
+                "Each dictionary in magnet_links must contain a 'link' key."
+            )
         if not isinstance(link["link"], str):
-            raise ValueError("The 'link' value in the dictionaries in magnet_links must be a string.")
+            raise ValueError(
+                "The 'link' value in the dictionaries in magnet_links must be a string."
+            )
         if "uptobox.com" in link["link"]:
             uptobox_links.append(link["link"])
 
     return uptobox_links
+
 
 def save_link(link: str) -> None:
     """
@@ -118,6 +123,7 @@ def check_magnet_instant(magnet: str) -> bool:
         print(f"Error checking magnet instant: {exc}")
     return None
 
+
 def upload_magnet_and_get_links(magnet: str) -> List[str]:
     """
     Uploads the magnet link and returns the torrent links.
@@ -164,9 +170,7 @@ def process_magnet(magnet: str):
 
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {
-                executor.submit(save_link, link) for link in torrent_links
-            }
+            futures = {executor.submit(save_link, link) for link in torrent_links}
             for _ in concurrent.futures.as_completed(futures):
                 pass
     except (ValueError, APIError) as exc:
@@ -220,9 +224,7 @@ def debrid_persistence_checks(title: str):
 
             # Only add links to the filtered list if confidence is greater than 0
             if confidence > 0:
-                link[
-                    "confidence"
-                ] = confidence  # Add a confidence score to the link
+                link["confidence"] = confidence  # Add a confidence score to the link
                 filtered_links.append(link)
 
         return {"status": "success", "data": {"links": filtered_links}}
@@ -412,7 +414,9 @@ def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, 
 
     if isinstance(uri, str) and not uri.startswith("magnet:"):
         try:
-            magnet_uri = ad._download_and_upload_single_file(uri)  # pylint: disable=protected-access
+            magnet_uri = ad._download_and_upload_single_file(
+                uri
+            )  # pylint: disable=protected-access
         except (ValueError, APIError) as exc:
             result = (
                 False,
@@ -430,7 +434,10 @@ def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, 
         if res["data"]["magnets"][0]["instant"]:
             files = res["data"]["magnets"][0]["files"]
             excluded_files = [
-                n["n"] for n in files for ext in EXCLUDED_EXTENSIONS if n["n"].endswith(ext)
+                n["n"]
+                for n in files
+                for ext in EXCLUDED_EXTENSIONS
+                if n["n"].endswith(ext)
             ]
 
             if excluded_files:
@@ -440,12 +447,17 @@ def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, 
                     f"Extensions found: {EXCLUDED_EXTENSIONS}.",
                 )
             else:
-                result = False, "No excluded extensions found in magnet files. (AllDebrid)"
+                result = (
+                    False,
+                    "No excluded extensions found in magnet files. (AllDebrid)",
+                )
         elif TRANSMISSION_CHECK:
             resp = fetch_torrent_metadata(uri)
             excluded_files = [
-                file["name"] for file in resp["files"]
-                for ext in EXCLUDED_EXTENSIONS if file["name"].endswith(ext)
+                file["name"]
+                for file in resp["files"]
+                for ext in EXCLUDED_EXTENSIONS
+                if file["name"].endswith(ext)
             ]
 
             if excluded_files:
@@ -455,9 +467,14 @@ def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, 
                     f"Extensions found: {EXCLUDED_EXTENSIONS}.",
                 )
             else:
-                result = False, "No excluded extensions found in torrent metadata. (Transmission)"
+                result = (
+                    False,
+                    "No excluded extensions found in torrent metadata. (Transmission)",
+                )
 
     return result
+
+
 # def check_file_extensions(uri: Union[str, List[str]]) -> Tuple[bool, Union[str, None]]:
 #     """
 #     This function checks for excluded file extensions in a given magnet link or URI.

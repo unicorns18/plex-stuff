@@ -43,6 +43,7 @@ def api_key_required(func):
         if "apikey" in request.headers and request.headers["apikey"] == API_KEY:
             return func(*args, **kwargs)
         return jsonify({"error": "Missing or invalid API key."}), 401
+
     return decorated_function
 
 
@@ -71,7 +72,9 @@ def upload_to_debrid():
                 persistence_check = debrid_persistence_checks(title=title)
 
                 if persistence_check["status"] == "error":
-                    if attempt < max_retries - 1:  # If we haven't reached max retries yet, we sleep and then retry
+                    if (
+                        attempt < max_retries - 1
+                    ):  # If we haven't reached max retries yet, we sleep and then retry
                         time.sleep(delay_between_retries)
                         continue
                     return (
@@ -118,7 +121,9 @@ def upload_to_debrid():
 
         except (ValueError, APIError) as exc:
             print(f"Debug: Exception caught - {exc}")
-            if attempt < max_retries - 1:  # If we haven't reached max retries yet, we sleep and then retry
+            if (
+                attempt < max_retries - 1
+            ):  # If we haven't reached max retries yet, we sleep and then retry
                 time.sleep(delay_between_retries)
                 continue
             # else:
@@ -159,14 +164,16 @@ def validate_request_params(params):
         "sort_order": str,
         "min_seeds": int,
         "filter_uncached": bool,
-        "sort_by_quality": bool
+        "sort_by_quality": bool,
     }
 
     for param, type_ in valid_params.items():
         value = params.get(param)
 
         if value and not isinstance(value, type_):
-            return False, {"error": f"Invalid {param} format. Expected {type_.__name__}."}
+            return False, {
+                "error": f"Invalid {param} format. Expected {type_.__name__}."
+            }
 
     return True, {}
 
@@ -203,10 +210,24 @@ def search_id():
 
     except ValueError as exc:
         print(f"Debug: Exception caught - {exc}")
-        return jsonify({"error": "Maybe invalid input values..? Huh, maybe check how the requests JSON is passed :)."}), 500
+        return (
+            jsonify(
+                {
+                    "error": "Maybe invalid input values..? Huh, maybe check how the requests JSON is passed :)."
+                }
+            ),
+            500,
+        )
     except Exception as exc:  # pylint: disable=broad-except
         print(f"Debug: Exception caught - {exc}")
-        return jsonify({"error": "Something went wrong during the search_best_qualities phase. DM unicorns pls."}), 500
+        return (
+            jsonify(
+                {
+                    "error": "Something went wrong during the search_best_qualities phase. DM unicorns pls."
+                }
+            ),
+            500,
+        )
 
 
 @app.route("/ping", methods=["GET"])

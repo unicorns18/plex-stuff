@@ -87,7 +87,10 @@ COUNT = "count"
 TOTAL = "total"
 RETRIEVED = "retrieved"
 
-def extract_match_type_total_retrieved(response: dict) -> Tuple[Optional[str], int, int]:
+
+def extract_match_type_total_retrieved(
+    response: dict,
+) -> Tuple[Optional[str], int, int]:
     match = NONE
     total = 0
     retrieved = 0
@@ -107,7 +110,6 @@ def extract_match_type_total_retrieved(response: dict) -> Tuple[Optional[str], i
         retrieved = count.get(RETRIEVED, 0)
 
     return match, total, retrieved
-
 
 
 def extract_details(res: Dict) -> Dict:
@@ -205,10 +207,10 @@ def search(
             ConnectionError,
             requests.Timeout,
             requests.TooManyRedirects,
-        ) as exc:  
+        ) as exc:
             retries += 1
             print(
-                f"Error occurred while attempting to fetch data: {exc}. Retrying in 5 seconds. Attempt {retries} of {max_retries}"  
+                f"Error occurred while attempting to fetch data: {exc}. Retrying in 5 seconds. Attempt {retries} of {max_retries}"
             )
             time.sleep(5)
         except Exception as exc:  # pylint: disable=broad-except
@@ -218,14 +220,12 @@ def search(
         finally:
             session.close()
     else:
-        error_message = (
-            f"Failed to retrieve data after {max_retries} attempts."  
-        )
+        error_message = f"Failed to retrieve data after {max_retries} attempts."
         print(error_message)
         return {"error": error_message}
 
     if response.get("result", {}).get("status") != "success":
-        error_message = "Error: Did not receive a successful response from the server." 
+        error_message = "Error: Did not receive a successful response from the server."
         print(error_message)
         return {"error": error_message}
 
@@ -234,7 +234,7 @@ def search(
         print(error_message)
         return {"error": error_message}
 
-    _, _, _ = extract_match_type_total_retrieved(response) 
+    _, _, _ = extract_match_type_total_retrieved(response)
     scraped_releases = extract_scraped_releases(response)
 
     if not scraped_releases:
@@ -315,10 +315,7 @@ def get_season_data(
 def get_season_data_imdb(
     imdb_id: str, retries: int, backoff_factor: float
 ) -> Optional[Dict]:
-
-    retry_strategy = urllib3.util.Retry(
-        total=retries, backoff_factor=backoff_factor
-    )
+    retry_strategy = urllib3.util.Retry(total=retries, backoff_factor=backoff_factor)
     adapter = requests.adapters.HTTPAdapter(max_retries=retry_strategy)
 
     with requests.Session() as req_session:
@@ -331,7 +328,7 @@ def get_season_data_imdb(
                 "external_source": "imdb_id",
             }
             response = req_session.get(
-                f"{BASE_URL}/find/{imdb_id}?{urlencode(search_params)}", 
+                f"{BASE_URL}/find/{imdb_id}?{urlencode(search_params)}",
                 timeout=10,
             )
             response.raise_for_status()
@@ -339,11 +336,13 @@ def get_season_data_imdb(
             tv_show_id = sj.loads(response.content).get("tv_results", [{}])[0].get("id")
             if tv_show_id is not None:
                 response = req_session.get(
-                    f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}", 
+                    f"{BASE_URL}/tv/{tv_show_id}?api_key={TMDB_API_KEY}",
                     timeout=10,
                 )
                 response.raise_for_status()
-                return {"total_seasons": sj.loads(response.content).get("number_of_seasons")}
+                return {
+                    "total_seasons": sj.loads(response.content).get("number_of_seasons")
+                }
 
         except requests.exceptions.RequestException as exc:
             print(f"Error: {exc}")
@@ -354,10 +353,7 @@ def get_season_data_imdb(
 def get_season_data_title(
     title: str, retries: int, backoff_factor: float
 ) -> Optional[Dict]:
-
-    retry_strategy = urllib3.util.Retry(
-        total=retries, backoff_factor=backoff_factor
-    )
+    retry_strategy = urllib3.util.Retry(total=retries, backoff_factor=backoff_factor)
     adapter = requests.adapters.HTTPAdapter(max_retries=retry_strategy)
 
     with requests.Session() as req_session:
@@ -366,7 +362,9 @@ def get_season_data_title(
 
         try:
             search_params = {"api_key": TMDB_API_KEY, "query": title}
-            response = req_session.get(f"{BASE_URL}/search/tv?{urlencode(search_params)}", timeout=10)
+            response = req_session.get(
+                f"{BASE_URL}/search/tv?{urlencode(search_params)}", timeout=10
+            )
             response.raise_for_status()
 
             tv_show_id = sj.loads(response.content).get("results", [{}])[0].get("id")
@@ -376,7 +374,9 @@ def get_season_data_title(
                     timeout=10,
                 )
                 response.raise_for_status()
-                return {"total_seasons": sj.loads(response.content).get("number_of_seasons")}
+                return {
+                    "total_seasons": sj.loads(response.content).get("number_of_seasons")
+                }
 
         except requests.exceptions.RequestException as exc:
             print(f"Error: {exc}")
@@ -520,7 +520,9 @@ def search_best_qualities(
                         break
 
         if filter_uncached:
-            filtered_results = [item for item in filtered_results if item["cached"]]  # noqa: E501
+            filtered_results = [
+                item for item in filtered_results if item["cached"]
+            ]  # noqa: E501
 
         for item in filtered_results:
             item["score"] = getReleaseTags(item["title"], item["size"]).score

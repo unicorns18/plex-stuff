@@ -5,9 +5,7 @@ from collections import Counter
 from typing import List
 
 
-def jaccard_similarity(
-    list_one: List[str], list_two: List[str]
-) -> float:
+def jaccard_similarity(list_one: List[str], list_two: List[str]) -> float:
     """
     Jaccard similarity coefficient is a statistic used for,
     comparing the similarity and diversity of sample sets.

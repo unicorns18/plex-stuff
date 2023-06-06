@@ -8,6 +8,7 @@ from filters import clean_title
 DEFAULT_OPTS = "https://torrentio.strem.fun/sort=qualitysize|qualityfilter=480p,scr,cam/manifest.json"  # noqa: E501
 session = requests.Session()
 
+
 def get(url: str) -> None:
     """
     Sends a GET request to URL.
@@ -27,6 +28,7 @@ def get(url: str) -> None:
         return response
     except Exception:  # pylint: disable=W0703
         return None
+
 
 def search(query: str, type_: str) -> str:
     """
@@ -48,6 +50,7 @@ def search(query: str, type_: str) -> str:
     meta = get(url)
     return meta["metas"][0]["imdb_id"]
 
+
 def extract_info(result):
     """
     Extracts the necessary information from the search result
@@ -63,12 +66,21 @@ def extract_info(result):
         Dictionary with title, size, links, seeds, and source
     """
     title = clean_title(result["title"].split("\n")[0].replace(" ", "."))
-    size_text = re.search(r"(?<=💾 )([0-9]+.?[0-9]+)(?= GB| MB)", result["title"]).group()
+    size_text = re.search(
+        r"(?<=💾 )([0-9]+.?[0-9]+)(?= GB| MB)", result["title"]
+    ).group()
     size = float(size_text) / 1000 if "MB" in result["title"] else float(size_text)
     links = ["magnet:?xt=urn:btih:" + result["infoHash"] + "&dn=&tr="]
     seeds = int(re.search(r"(?<=👤 )([0-9]+)", result["title"]).group() or 0)
     source = re.search(r"(?<=⚙️ )(.*)(?=\n|$)", result["title"]).group() or "unknown"
-    return {"title": title, "size": size, "links": links, "seeds": seeds, "source": source}
+    return {
+        "title": title,
+        "size": size,
+        "links": links,
+        "seeds": seeds,
+        "source": source,
+    }
+
 
 def scrape(query: str, altquery: str):
     """
@@ -91,7 +103,11 @@ def scrape(query: str, altquery: str):
     if altquery == "(.*)":
         altquery = query
 
-    type_ = "show" if re.search(r"(S[0-9]|complete|S\?[0-9])", altquery, re.IGNORECASE) else "movie"
+    type_ = (
+        "show"
+        if re.search(r"(S[0-9]|complete|S\?[0-9])", altquery, re.IGNORECASE)
+        else "movie"
+    )
 
     opts = DEFAULT_OPTS.split("/")[-2] if DEFAULT_OPTS.endswith("manifest.json") else ""
 
@@ -112,7 +128,9 @@ def scrape(query: str, altquery: str):
     response = get(url)
 
     if "streams" not in response:
-        print(f"[torrentio] error: {response if response is not None else 'unknown error'}")
+        print(
+            f"[torrentio] error: {response if response is not None else 'unknown error'}"
+        )
         return []
 
     for result in response["streams"]:
