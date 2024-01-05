@@ -10,3 +10,4 @@ Requests==2.31.0
 requests_cache==1.0.1
 tenacity==8.2.2
 urllib3==1.26.15
+werkzeug>=2.2.3 # not directly required, pinned by Snyk to avoid a vulnerability
