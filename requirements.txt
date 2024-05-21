@@ -6,7 +6,7 @@ pytest==7.3.1
 python-dotenv==1.0.0
 redis==4.5.5
 regex==2023.5.5
-Requests==2.31.0
+Requests==2.32.0
 requests_cache==1.0.1
 tenacity==8.2.2
 urllib3==1.26.15
